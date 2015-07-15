@@ -15,17 +15,69 @@
 
 \subsection*{Abstract}
 
+The so-called \emph{CAP Theorem} is a frequently cited impossibility result in distributed systems,
+especially among the new generation of \emph{NoSQL} distributed databases. In this paper we show
+that the proof of CAP is incorrect, due to problems in the way it is formalized. We therefore
+propose that it should be referred to as \emph{CAP Principle} rather than \emph{CAP Theorem}.
+However, the trade-off highlighted by CAP is real, and in this paper we discuss some alternative
+results from distributed systems theory that can help practitioners reason about trade-offs in their
+systems.
+
 \section{Background}
 
-\cite{Fox1999bs, Brewer2012tr, Gilbert2012bf, Brewer2012ba, Gilbert2002il, Brewer2000vd}
-\cite{Abadi2012hb}
-\cite{Lynch1989kj}
-\cite{Attiya1994gw}
+Replicated databases maintain copies of the same data on multiple nodes, potentially in disparate
+geographical locations, in order to tolerate faults (failures of nodes or communication links) and
+to provide lower latency to users (by allowing users to use a nearby site). However, implementing
+reliable, fault-tolerant applications in a distributed system is difficult: if there are multiple
+copies of the data on different nodes, they may be inconsistent with each other, and an application
+that is not designed to handle such inconsistencies may produce incorrect results.
+
+In order to provide a simpler programming model to application developers, the designers of
+distributed data systems have explored various consistency guarantees. Distributed consistency
+models such as linearizability~\cite{Herlihy1990jq}, sequential consistency~\cite{Lamport1979ky},
+causal consistency~\cite{Ahamad1995gl} and pipelined RAM (PRAM)~\cite{Lipton1988uh} encapsulate
+certain guarantees about the propagation of writes between the replicas of the database, and thus
+permit the programmer to ignore the problem of replica divergence to some degree. By analogy,
+transaction isolation models such as serializability, snapshot isolation~\cite{Berenson1995kj},
+repeatable read and read committed~\cite{Gray1976us} describe certain guarantees about concurrently
+executing transactions, and permit the programmer to ignore the problem of race conditions to some
+degree~\cite{Bailis2014vc}.
+
+A strong consistency model like linearizability provides an easy-to-understand guarantee:
+informally, all operations behave as if they executed atomically on a \emph{single copy} of the
+data. However, this guarantee comes at the cost of reduced performance~\cite{Attiya1994gw} and
+fault tolerance~\cite{Davidson1985hv} compared to weaker consistency models. In particular, as we
+discuss in this paper, algorithms that ensure strong consistency among replicas are sensitive to
+message delays and faults in the network. Many real computer networks are prone to unbounded delays
+and dropped messages~\cite{Bailis2014jx}, making the fault tolerance of distributed consistency
+algorithms an important issue in practice.
+
+A particular kind of fault that has been studied since the 1970s is the \emph{network partition}, a
+communication fault that splits the network into subsets of nodes such that nodes in one subset
+cannot communicate with nodes in another~\cite{Johnson1975we, Lindsay1979wv, Davidson1985hv}. As
+long as the partition exists, any data modifications made in one subset of nodes cannot be visible
+to nodes in another subset, since all messages between them are lost. Thus, an algorithm that
+maintains the illusion of a single copy may have to delay operations until the partition is healed,
+to avoid the risk of introducing inconsistent data in different subsets.
+
+This trade-off was already known in 1975~\cite{Johnson1975we}, but it was rediscovered in the early
+2000s, when the web's growing commercial popularity made geographic distribution and high
+availability important to many organizations~\cite{Brewer2012tr}. It was originally called the
+\emph{CAP Principle} by Fox and Brewer~\cite{Fox1999bs, Brewer2000vd}, where CAP stands for
+\emph{Consistency}, \emph{Availability} and \emph{Partition tolerance}. After the principle was
+formalized by Gilbert and Lynch~\cite{Gilbert2002il, Gilbert2012bf} it became known as the
+\emph{CAP Theorem}.
+
+CAP was adopted by distributed systems practitioners to critique design
+decisions~\cite{Hodges2013tj}, and became a rallying cry of the NoSQL movement~\cite{Brewer2012ba}.
+It provoked a lively debate about trade-offs in data systems, partly due to its definitions of
+consistency, availability and partition tolerance being unclear. We will examine these definitions
+in section~\ref{sec:definitions}.
+
 \cite{Attiya1995bm}
 \cite{Fischer1985tt}
 \cite{Darcy2010ta}
 \cite{Robinson2010tp}
-\cite{Johnson1975we, Lindsay1979wv, Davidson1985hv}
 \cite{Mahajan2011wz}
 \cite{Sewell2010fj}
 
