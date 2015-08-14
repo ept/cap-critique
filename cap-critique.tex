@@ -116,7 +116,7 @@ system is faulty, thus increasing the expected mean time to failure (MTTF) of th
 Using such a system does not automatically make a service 100\% available, but it may increase the
 observed availability during operation, compared to using a system that is not fault-tolerant.
 
-\subsubsection{The A in CAP}
+\subsubsection{The A in CAP}\label{sec:a-in-cap}
 
 Does the A in CAP refer to a property of a system design, or to an observed metric during system
 operation? This distinction is unclear. Brewer does not offer a precise definition of availability,
@@ -146,7 +146,7 @@ reachable by the consumer. Indeed, many so-called highly available or fault-tole
 ``unavailable'' under Gilbert and Lynch's definition, even though they may have very high uptime in
 practice.
 
-\subsubsection{Failed nodes}
+\subsubsection{Failed nodes}\label{sec:failed-node-exception}
 
 Another curious aspect of Gilbert and Lynch's definition of availability is the proviso of applying
 only to \emph{non-failed} nodes. This allows the aforementioned definition of a CA system as one
@@ -161,10 +161,8 @@ Consistency is also an overloaded word in data systems: consistency in the sense
 different property from consistency in CAP~\cite{Brewer2012ba}. In the distributed systems
 literature, consistency is usually understood as not one particular property, but as a range of
 properties with varying strengths of guarantee. Examples of such consistency models include
-linearizability~\cite{Herlihy1990jq},\footnote{Linearizability is also known as \emph{atomic
-consistency}, but it has nothing to do with the A in ACID.} sequential
-consistency~\cite{Lamport1979ky}, causal consistency~\cite{Ahamad1995gl} and
-PRAM~\cite{Lipton1988uh}.
+linearizability~\cite{Herlihy1990jq}, sequential consistency~\cite{Lamport1979ky}, causal
+consistency~\cite{Ahamad1995gl} and PRAM~\cite{Lipton1988uh}.
 
 There is some overlap between distributed consistency models (which pertain to systems in which
 there are multiple replicas of the data) and transaction isolation models (which pertain to systems
@@ -174,7 +172,7 @@ isolation~\cite{Berenson1995kj}, repeatable read and read committed~\cite{Gray19
 al.~\cite{Bailis2014vc} demonstrate a unified framework for reasoning about both distributed
 consistency and transaction isolation in terms of CAP.
 
-\subsubsection{The C in CAP}
+\subsubsection{The C in CAP}\label{sec:c-in-cap}
 
 Fox and Brewer~\cite{Fox1999bs} define the C in CAP as one-copy serializability
 (1SR)~\cite{Bernstein1987va}, whereas Gilbert and Lynch~\cite{Gilbert2002il} define it as
@@ -280,29 +278,146 @@ many messages sent from one node to another.'' In this definition it is unclear 
 of lost messages is unbounded but finite, or whether it is potentially infinite.
 
 Partitions of a finite duration are possible with fair-loss links, and thus an algorithm that is
-correct in a fair-loss system model can tolerate partitions of a finite duration. Partitions of an
-infinite duration require some further thought, as we shall see in section~\ref{sec:proofs}.
+correct in a system model of fair-loss links can tolerate partitions of a finite duration.
+Partitions of an infinite duration require some further thought, as we shall see in
+section~\ref{sec:proofs}.
 
 \section{The CAP Proofs}\label{sec:proofs}
 
-TODO: In this section, go through the theorems of Gilbert and Lynch one by one, and prove each of
-them false.
+In this section, we build upon the discussion of definitions in the last section, and examine the
+proofs of the purported theorems and corollary of Gilbert and Lynch~\cite{Gilbert2002il}
+(collectively known as the ``proof of the CAP theorem''). We demonstrate that each of these proofs
+is false.
 
-% Even eventual consistency (replica convergence within finite time) and availability (operations
-% are processed within finite time) cannot be achieved simultaneously if the network may exhibit
-% partitions of infinite duration. Thus, Theorem 1 does not serve to differentiate between stronger
-% consistency models (e.g.\ linearizability) and weaker ones (eventual convergence).
+\subsection{Theorem 1}\label{sec:theorem1}
+
+Gilbert and Lynch's Theorem 1 is stated as follows:
+
+\emph{It is impossible in the asynchronous network model to implement a read/write data object that
+guarantees the following properties:}
+\begin{itemize}
+\item \emph{Availability}
+\item \emph{Atomic consistency}\footnote{\emph{Atomic consistency} is synonymous with linearizability, and
+it is unrelated to the A in ACID.}
+\end{itemize}
+\emph{in all fair executions (including those in which messages are lost).}
+
+\subsubsection{Counterexample}
+
+The simplest way of showing Theorem 1 to be false is by giving a counterexample. The ABD algorithm,
+published by Attiya, Bar-Noy and Dolev five years before CAP was proposed~\cite{Attiya1995bm},
+implements an atomic (linearizable) read-write register\footnote{ABD~\cite{Attiya1995bm} is an
+algorithm for a single-writer multi-reader register. It was extended to the multi-writer case by
+Lynch and Shvartsman~\cite{Lynch1997gr}.} in an unreliable asynchronous network, while also
+satisfying Gilbert and Lynch's definition of availability.
+
+If ABD is used with fair-loss links, communication is made reliable by retrying messages an
+unbounded number of times until they are delivered. Under this assumption, ABD executions of
+\emph{read} and \emph{write} operations always terminate provided that a majority of nodes is not
+faulty. As the CAP definition of availability only requires operations to terminate (there is no
+limit on the response time, as long as it is finite), this meets the CAP definition of availability.
+
+If nodes are permanently partitioned, or a majority of nodes fails, ABD employs a simple solution:
+any node that cannot communicate with a majority of nodes is deemed faulty (for example, it crashes
+itself). Under the CAP definition of availability, a faulty node is not required to respond to
+requests (section~\ref{sec:failed-node-exception}). There is nothing in the definition of CAP that
+prohibits nodes from becoming crashed due to network problems.
+
+Defining a minority partition as failed may feel like cheating: the intuition of CAP availability is
+that a minority partition should be able to continue processing. However, Gilbert and Lynch's
+definition of availability does not capture this intuition correctly, and it is not clear how the
+definition should be amended. (Requiring a node to always to respond, even if it has failed, would
+be nonsensical.)
+
+\subsubsection{Finite and infinite partitions}
+
+Even if we did redefine availability such that the ABD algorithm is ``unavailable,'' and thus not an
+acceptable counterexample, the proof of Theorem 1 would still be problematic.
+
+The proof rests on constructing an execution of an algorithm $A$ in which a write is followed by a
+read, while simultaneously a partition exists in the network. However, the algorithm $A$ may never
+exhibit such an execution: for example, the algorithm could simply wait until the partition is
+healed before allowing the write operation to complete. With any partition of finite duration, $A$
+would still satisfy the availability property, because the operations would eventually complete. In
+the asynchronous model, which does not make timing assumptions, such waiting is in fact expected.
+The proof is therefore false with regard to partitions of finite duration.
+
+Only if the partition is of infinite duration, $A$ is forced to make a choice\footnote{How the
+algorithm would make that choice in the absence of clocks -- since this is an asynchronous system
+model -- is unclear.} between waiting until the partition heals (which never happens, thus violating
+availability) and exhibiting the execution in the proof of Theorem 1 (thus violating
+linearizability). We can conclude that the proof of Theorem 1 is only valid in the case of an
+infinite partition.
+
+As previously mentioned, infinite partitions cannot occur in fair-loss links, and are usually
+considered a Byzantine failure mode. As discussions of CAP are usually in the context of
+non-Byzantine system models, we might conclude that Theorem 1 is false in the context in which it is
+normally applied.
+
+\subsubsection{Linearizability vs. eventual consistency}
+
+Note that in the case of an infinite partition, no information can ever flow from one sub-network to
+the other. Thus, even eventual consistency (replica convergence in finite time, see
+section~\ref{sec:c-in-cap}) is not possible in a system with an infinite partition, if availability
+is also required.
+
+The CAP theorem is often understood as demonstrating that linearizability cannot be achieved with
+high availability, whereas eventual consistency can. In this section we showed that in the only
+situation where the proof of Theorem 1 applies (an infinite partition), linearizable and eventually
+consistent algorithms \emph{both} violate the availability requirement.
+
+Thus, Theorem 1 does not serve to differentiate between the availability of linearizable and
+eventually consistent systems. The common interpretation, namely that Theorem 1 proves the existence
+of a trade-off between availability and consistency, is false.
+
+\subsection{Corollary 1.1}\label{sec:corollary}
+
+Gilbert and Lynch's Corollary~1.1 is stated as follows:
+
+\emph{It is impossible in the asynchronous network model to implement a read/write data object that
+guarantees the following properties:}
+\begin{itemize}
+\item \emph{Availability, in all fair executions,}
+\item \emph{Atomic consistency, in fair executions in which \emph{no} messages are lost.}
+\end{itemize}
+
+The proof of Corollary~1.1 relies on Theorem~1 in a situation where no messages are lost. However,
+we showed that the proof of Theorem~1 is only true in the case of an infinite partition, in which
+case an infinite number of messages are lost. Thus, Corollary~1.1 is false.
+
+\subsection{Theorem 2}\label{sec:theorem2}
+
+Gilbert and Lynch's Theorem~2 is similar to Theorem~1, except that it is stated in the partially
+synchronous network model rather than the asynchronous model.
+
+Theorem~2 is false for the same reasons as Theorem~1: the ABD algorithm provides a counterexample,
+and the execution described in the proof need not be exhibited by any algorithm in the case of a
+partition of finite duration. For a partition of infinite duration, the aforementioned observation
+about eventual consistency holds.
+
+% \subsection{Definition 3 and Theorem 4}\label{sec:theorem4}
 %
-% The intuition we want to capture is that a partition-tolerant system should allow the response
-% time (latency) of read/write requests to be lower than the duration of a partition, whereas the
-% time until replica convergence is allowed to exceed the duration of a partition. However, CAP does
-% not capture this intuition, since it does not consider the latency of operations. We will return
-% to this in section~\ref{sec:alternatives}.
+% Gilbert and Lynch's Definition~3 describes a new replica consistency model called \emph{Delayed-$t$
+% consistency}, and a replication algorithm called \emph{modified centralized algorithm}. Theorem~4 is
+% stated as follows:
+%
+% \emph{The modified centralized algorithm is Delayed-$t$ consistent.}
+%
+% The Delayed-$t$ model is similar to linearizability, except that it falls back to sequential
+% consistency in the case where messages are lost. The sequential consistency property is encoded in
+% requirement 3 of Definition 3, which states ``The order in $P$ is consistent with the order of
+% \emph{read} and \emph{write} requests submitted at each node''.
 
 \section{Alternatives to CAP}\label{sec:alternatives}
 
 TODO: In this section, present alternative theoretical results that can help practitioners reason
 about the design of their systems.
+
+% The intuition we want to capture is that a partition-tolerant system should allow the response
+% time (latency) of read/write requests to be lower than the duration of a partition, whereas the
+% time until replica convergence is allowed to exceed the duration of a partition. However, CAP does
+% not capture this intuition, since it does not consider the latency of operations. We will return
+% to this in section~\ref{sec:alternatives}.
 
 Idea: distinguish consistency models by whether an operation requires network communication to
 complete before it can return. This framework focuses on operation latency as a function of network
