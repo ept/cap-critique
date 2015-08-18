@@ -21,9 +21,9 @@ The so-called \emph{CAP Theorem} is a frequently cited impossibility result in d
 especially among the new generation of \emph{NoSQL} distributed databases. In this paper we show
 that the proof of CAP is incorrect, due to problems in the way it is formalized. We therefore
 propose that it should be referred to as \emph{CAP Principle} rather than \emph{CAP Theorem}.
-However, the general trade-off between replica consistency and sensitivity to network problems is
-real, and in this paper we discuss some alternative results from distributed systems theory that can
-help practitioners reason about trade-offs in their systems.
+However, it is true that there is a trade-off between replica consistency guarantees and tolerance
+of network faults, and in this paper we discuss some alternative results from distributed systems
+theory that can help practitioners reason about such trade-offs in their systems.
 
 \section{Background}
 
@@ -41,9 +41,9 @@ causal consistency~\cite{Ahamad1995gl} and pipelined RAM (PRAM)~\cite{Lipton1988
 certain guarantees about the propagation of writes between the replicas of the database, and thus
 permit the programmer to ignore the problem of replica divergence to some degree. By analogy,
 transaction isolation models such as serializability, snapshot isolation~\cite{Berenson1995kj},
-repeatable read and read committed~\cite{Gray1976us} describe certain guarantees about concurrently
-executing transactions, and permit the programmer to ignore the problem of race conditions to some
-degree~\cite{Bailis2014vc}.
+repeatable read and read committed~\cite{Gray1976us} describe certain guarantees about isolation
+between concurrently executing transactions, and permit the programmer to ignore the problem of race
+conditions to some degree~\cite{Bailis2014vc}.
 
 A strong consistency model like linearizability provides an easy-to-understand guarantee:
 informally, all operations behave as if they executed atomically on a \emph{single copy} of the
@@ -64,17 +64,22 @@ to avoid the risk of introducing inconsistent data in different subsets.
 
 This trade-off was already known in 1975~\cite{Johnson1975we}, but it was rediscovered in the early
 2000s, when the web's growing commercial popularity made geographic distribution and high
-availability important to many organizations~\cite{Brewer2012tr}. It was originally called the
-\emph{CAP Principle} by Fox and Brewer~\cite{Fox1999bs, Brewer2000vd}, where CAP stands for
-\emph{Consistency}, \emph{Availability} and \emph{Partition tolerance}. After the principle was
+availability important to many organizations~\cite{Brewer2012tr, Vogels2008ey}. It was originally
+called the \emph{CAP Principle} by Fox and Brewer~\cite{Fox1999bs, Brewer2000vd}, where CAP stands
+for \emph{Consistency}, \emph{Availability} and \emph{Partition tolerance}. After the principle was
 formalized by Gilbert and Lynch~\cite{Gilbert2002il, Gilbert2012bf} it became known as the
 \emph{CAP Theorem}.
 
 CAP was adopted by distributed systems practitioners to critique design
 decisions~\cite{Hodges2013tj}, and became a rallying cry of the NoSQL movement~\cite{Brewer2012ba}.
 It provoked a lively debate about trade-offs in data systems, partly due to its definitions of
-consistency, availability and partition tolerance being unclear~\cite{Robinson2010tp}. We will
-examine these definitions in section~\ref{sec:definitions}.
+consistency, availability and partition tolerance being unclear~\cite{Robinson2010tp}.
+
+The rest of this paper is organized as follows: in section~\ref{sec:definitions} we compare various
+definitions of consistency, availability and partition tolerance. We then examine the formalization
+of CAP by Gilbert and Lynch~\cite{Gilbert2002il} in section~\ref{sec:proofs}, and show that the
+proofs are incorrect. Finally, in section~\ref{sec:alternatives} we discuss some alternatives to CAP
+that are useful for reasoning about trade-offs in distributed systems.
 
 \section{CAP Theorem Definitions}\label{sec:definitions}
 
@@ -87,10 +92,11 @@ network partition occurs, a system must choose between either consistency (CP) o
 
 Some authors~\cite{Darcy2010ta, Liochon2015vt} define a CP system as one in which a majority of
 nodes on one side of a partition can continue operating normally, and a CA system as one that may
-fail catastrophically under a network partition. However, this definition is not universally agreed,
-since it is counterintuitive to label a system as ``available'' if it fails catastrophically under a
-partition, while a system that continues partially operating in the same situation is labelled
-``unavailable'' (see section~\ref{sec:partitions}).
+fail catastrophically under a network partition (since it is designed on the assumption that
+partitions are very rare). However, this definition is not universally agreed, since it is
+counterintuitive to label a system as ``available'' if it fails catastrophically under a partition,
+while a system that continues partially operating in the same situation is labelled ``unavailable''
+(see section~\ref{sec:partitions}).
 
 Disagreement about the definitions of terms like \emph{availability} is the source of many
 misunderstandings about CAP. Unclear definitions also sabotage attempts to formalize the
@@ -105,10 +111,9 @@ a successful response. A response is usually considered successful if it is vali
 satisfies the database's safety properties) and it arrives at the client within some timeout, which
 may be specified in a \emph{service level agreement} (SLA). Availability in this sense is a metric
 that is empirically observed during a period of a service's operation. A service may be available
-(up) or unavailable (down) at any given time, but it doesn't make sense to say that some software
-package or algorithm is `available' or `unavailable' in general, since the uptime percentage is
-only known in retrospect, after a period of operation (during which various faults may have
-occurred).
+(up) or unavailable (down) at any given time, but it is nonsensical to say that some software
+package or algorithm is `available' or `unavailable' in general, since the uptime percentage is only
+known in retrospect, after a period of operation (during which various faults may have occurred).
 
 There is a long tradition of \emph{highly available} and \emph{fault-tolerant} systems, whose
 algorithms are designed such that the system can remain available (up) even when some part of the
@@ -148,12 +153,12 @@ practice.
 
 \subsubsection{Failed nodes}\label{sec:failed-node-exception}
 
-Another curious aspect of Gilbert and Lynch's definition of availability is the proviso of applying
-only to \emph{non-failed} nodes. This allows the aforementioned definition of a CA system as one
-that fails catastrophically if a network partition occurs: if the partition causes all nodes to
-fail, then the availability requirement does not apply to any nodes, and thus it is trivially
-satisified, even if no node is able to respond to any requests. This is logically consistent, but a
-somewhat counter-intuitive definition of availability.
+Another noteworthy aspect of Gilbert and Lynch's definition of availability is the proviso of
+applying only to \emph{non-failed} nodes. This allows the aforementioned definition of a CA system
+as one that fails catastrophically if a network partition occurs: if the partition causes all nodes
+to fail, then the availability requirement does not apply to any nodes, and thus it is trivially
+satisified, even if no node is able to respond to any requests. This is a valid definition, albeit
+somewhat counter-intuitive.
 
 \subsection{Consistency}\label{sec:consistency}
 
@@ -162,7 +167,8 @@ different property from consistency in CAP~\cite{Brewer2012ba}. In the distribut
 literature, consistency is usually understood as not one particular property, but as a range of
 properties with varying strengths of guarantee. Examples of such consistency models include
 linearizability~\cite{Herlihy1990jq}, sequential consistency~\cite{Lamport1979ky}, causal
-consistency~\cite{Ahamad1995gl} and PRAM~\cite{Lipton1988uh}.
+consistency~\cite{Ahamad1995gl} and PRAM~\cite{Lipton1988uh}. A consistency model is a safety
+property regarding the propagation of updates between replicas.
 
 There is some overlap between distributed consistency models (which pertain to systems in which
 there are multiple replicas of the data) and transaction isolation models (which pertain to systems
@@ -190,14 +196,14 @@ operations are being executed, then the safety property cannot be satisfied, bec
 about the value of $w$.
 
 The C of CAP is sometimes referred to as \emph{strong consistency} (a term that is not formally
-defined), and contrasted with \emph{eventual consistency}~\cite{Terry1994fp}, which is often
-regarded as the weakest level of consistency that is useful to applications. Eventual consistency
-means that if a system stops accepting writes and sufficient\footnote{It is not clear what amount of
-communication is `sufficient'. A possible formalization would be to require all replicas to converge
-to the same value within finite time, assuming fair-loss links (see section \ref{sec:fairloss}).}
-communication occurs, then eventually all replicas will converge to the same value. However, as the
-aforementioned list of consistency models indicates, it is overly simplistic to cast `strong' and
-eventual consistency as the only possible choices.
+defined), and contrasted with \emph{eventual consistency}~\cite{Terry1994fp, Vogels2008ey}, which is
+often regarded as the weakest level of consistency that is useful to applications. Eventual
+consistency means that if a system stops accepting writes and sufficient\footnote{It is not clear
+what amount of communication is `sufficient'. A possible formalization would be to require all
+replicas to converge to the same value within finite time, assuming fair-loss links (see section
+\ref{sec:fairloss}).} communication occurs, then eventually all replicas will converge to the same
+value. However, as the aforementioned list of consistency models indicates, it is overly simplistic
+to cast `strong' and eventual consistency as the only possible choices.
 
 \subsubsection{Probabilistic consistency}
 
@@ -231,25 +237,23 @@ However, we can clarify the definitions by observing that the correctness of a d
 is always subject to assumptions about the faults that may occur during its execution. If you take
 an algorithm that assumes fair-loss links and crash-stop processes, and subject it to Byzantine
 faults, the execution will most likely violate safety properties that were supposedly guaranteed.
-Similarly, we can interpret \emph{partition tolerance} as meaning ``a network partition is among the
-faults that are assumed to be possible in the system.''
+These assumptions are typically encoded in a \emph{system model}, and non-Byzantine system models
+rule out certain kinds of fault as impossible (so algorithms are not expected to tolerate them).
 
-Note that this definition of partition tolerance is a statement of assumptions about the underlying
-system model. This makes it different from consistency and availability, which are properties of the
-possible executions of an algorithm. It makes no sense to say that an algorithm ``provides partition
-tolerance,'' we can only say that an algorithm ``assumes that partitions may occur.''
+Thus, we can interpret \emph{partition tolerance} as meaning ``a network partition is among the
+faults that are assumed to be possible in the system.'' Note that this definition of partition
+tolerance is a statement about the system model, whereas consistency and availability are properties
+of the possible executions of an algorithm. It is misleading to say that an algorithm ``provides
+partition tolerance,'' and it is better to say that an algorithm ``assumes that partitions may
+occur.''
 
 If an algorithm assumes the absence of partitions, and is nevertheless subjected to a partition, it
 may violate its guarantees in arbitrarily undefined ways (including failing to respond even after
-the partition is repaired, or deleting arbitrary amounts of data). Although it may seem that such
+the partition is repaired, or deleting arbitrary amounts of data). Even though it may seem that such
 arbitrary failure semantics are not very useful, various systems exhibit such behavior in
-practice~\cite{Kingsbury2014tk, Kingsbury2015uk}.
-
-It has been suggested that partition tolerance should instead be phrased as ``possibility of
-partitions occurring''~\cite{Robinson2010tp}, which makes clear that it is not a property of an
-algorithm, but a property of the underlying infrastructure. In practice, making networks highly
-reliable is very expensive~\cite{Bailis2014jx}, so most distributed programs must assume that
-partitions will occur sooner or later~\cite{Hale2010we}.
+practice~\cite{Kingsbury2014tk, Kingsbury2015uk}. Making networks highly reliable is very
+expensive~\cite{Bailis2014jx}, so most distributed programs must assume that partitions will occur
+sooner or later~\cite{Hale2010we}.
 
 \subsubsection{Partitions and fair-loss links}\label{sec:fairloss}
 
@@ -261,18 +265,20 @@ that the loss of an individual message can be modeled as a short-lived network p
 
 In the design of distributed systems algorithms, a commonly assumed system model is \emph{fair-loss
 links}~\cite{Cachin2011wt}. A network link has the fair-loss property if the probability of a
-message \emph{not} being lost is non-zero, i.e.\ the link sometimes delivers messages, and it does
-not systematically drop every message. On a fair-loss link, message delivery can be made reliable by
-retrying a message an unbounded number of times: the message is guaranteed to be eventually
-delivered after a finite number of attempts~\cite{Cachin2011wt}.
+message \emph{not} being lost is non-zero, i.e.\ the link sometimes delivers messages. The link may
+have intervals of time during which all messages are dropped, but those intervals must be of finite
+duration. On a fair-loss link, message delivery can be made reliable by retrying a message an
+unbounded number of times: the message is guaranteed to be eventually delivered after a finite
+number of attempts~\cite{Cachin2011wt}.
 
-Arguably, fair-loss links are a good model of networks in practice: faults occur randomly; messages
-are lost while the fault is occurring; the fault lasts for some finite duration (perhaps seconds,
-perhaps hours), and eventually it is repaired (perhaps after human intervention). There is no
-malicious actor in the network who can cause systematic message loss over unlimited periods of time
--- such malicious actors are only assumed in the design of Byzantine fault tolerant algorithms.
+We argue that fair-loss links are a good model of most networks in practice: faults occur randomly
+(not due to malicious activity); messages are lost while the fault is occurring; the fault lasts for
+some finite duration (perhaps seconds, perhaps hours), and eventually it is repaired (perhaps after
+human intervention). There is no malicious actor in the network who can cause systematic message
+loss over unlimited periods of time -- such malicious actors are usually only assumed in the design
+of Byzantine fault tolerant algorithms.
 
-Is ``possibility of partitions occurring'' equivalent to assuming fair-loss links? Gilbert and
+Is ``partitions may occur'' equivalent to assuming fair-loss links? Gilbert and
 Lynch~\cite{Gilbert2002il} define partitions as ``the network will be allowed to lose arbitrarily
 many messages sent from one node to another.'' In this definition it is unclear whether the number
 of lost messages is unbounded but finite, or whether it is potentially infinite.
@@ -406,7 +412,7 @@ about eventual consistency holds.
 % The Delayed-$t$ model is similar to linearizability, except that it falls back to sequential
 % consistency in the case where messages are lost. The sequential consistency property is encoded in
 % requirement 3 of Definition 3, which states ``The order in $P$ is consistent with the order of
-% \emph{read} and \emph{write} requests submitted at each node''.
+% \emph{read} and \emph{write} requests submitted at each node.''
 
 \section{Alternatives to CAP}\label{sec:alternatives}
 
