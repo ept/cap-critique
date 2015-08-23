@@ -616,11 +616,36 @@ framework.
 
 \section{Conclusion}
 
-Even though the CAP Theorem is false (so it is not a theorem), the informally defined CAP principle
-may still be useful for designing practical systems.
+In this paper we showed that the CAP theorem is false (so it is not a theorem). Although an
+informally-defined CAP principle may still be useful for designing practical systems, we have
+pointed out that the definitions of consistency, availability and partition tolerance in the
+literature are somewhat contradictory and counter-intuitive, and thus it is unclear whether any
+precise meaning could be ascribed to such a principle.
 
+CAP has nevertheless been very influential in the design of distributed data systems. It deserves
+credit for catalyzing the exploration of the design space of systems with weak consistency
+guarantees, e.g.\ in the NoSQL movement. However, we believe that CAP has now reached the end of its
+usefulness; we recommend that it should be relegated to the history of distributed systems, and no
+longer be used for justifying design decisions.
 
+As an alternative to CAP, we propose a simple framework for reasoning about trade-offs between
+consistency guarantees and tolerance of network faults in a replicated database. Every operation is
+categorized as either $O(d)$, if its latency is proportional to network delay, or $O(1)$, if it is
+independent of network delay. On the assumption that lost packets are retransmitted an unbounded
+number of times, we can model network faults (including partitions) as periods of greatly increased
+delay. The algorithm's dependency on network delay determines whether the system can still meet its
+service level agreement (SLA) when a network fault occurs.
 
+The actual dependency of a system on network delay depends on its implementation, but -- in keeping
+with the goal of CAP -- we can prove that certain levels of consistency cannot be achieved without
+making operation latency proportional to network delay. These theoretical lower bounds are
+summarized in table~\ref{tab:op-latency}. We have not proved any new results in this paper, but
+merely drawn on existing distributed systems research dating mostly from the 1990s (and thus
+predating CAP).
+
+We hope that by being more rigorous about the implications of different consistency levels on
+performance and fault tolerance, we can encourage designers of distributed data systems to continue
+the exploration of the design space.
 
 {\footnotesize
 \bibliographystyle{plainnat}
