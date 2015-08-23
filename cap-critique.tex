@@ -196,8 +196,8 @@ operations are being executed, then the safety property cannot be satisfied, bec
 about the value of $w$.
 
 The C of CAP is sometimes referred to as \emph{strong consistency} (a term that is not formally
-defined), and contrasted with \emph{eventual consistency}~\cite{Terry1994fp, Vogels2008ey}, which is
-often regarded as the weakest level of consistency that is useful to applications. Eventual
+defined), and contrasted with \emph{eventual consistency}~\cite{Terry1994fp, Vogels2008ey, Bailis2013jc},
+which is often regarded as the weakest level of consistency that is useful to applications. Eventual
 consistency means that if a system stops accepting writes and sufficient\footnote{It is not clear
 what amount of communication is `sufficient'. A possible formalization would be to require all
 replicas to converge to the same value within finite time, assuming fair-loss links (see section
@@ -308,7 +308,7 @@ it is unrelated to the A in ACID.}
 \end{itemize}
 \emph{in all fair executions (including those in which messages are lost).}
 
-\subsubsection{Counterexample}
+\subsubsection{Counterexample}\label{sec:abd-algorithm}
 
 The simplest way of showing Theorem 1 to be false is by giving a counterexample. The ABD algorithm,
 published by Attiya, Bar-Noy and Dolev five years before CAP was proposed~\cite{Attiya1995bm},
@@ -416,38 +416,194 @@ about eventual consistency holds.
 
 \section{Alternatives to CAP}\label{sec:alternatives}
 
-TODO: In this section, present alternative theoretical results that can help practitioners reason
-about the design of their systems.
+In section~\ref{sec:definitions} we explored the definitions of the terms \emph{consistency},
+\emph{availability} and \emph{partition tolerance}, and noted that a wide range of ambiguous and
+mutually incompatible interpretations have been proposed, leading to widespread confusion. Then,
+using Gilbert and Lynch's definition of those terms, we showed in section~\ref{sec:proofs} that the
+purported proofs of CAP are incorrect.
 
-% The intuition we want to capture is that a partition-tolerant system should allow the response
-% time (latency) of read/write requests to be lower than the duration of a partition, whereas the
-% time until replica convergence is allowed to exceed the duration of a partition. However, CAP does
-% not capture this intuition, since it does not consider the latency of operations. We will return
-% to this in section~\ref{sec:alternatives}.
+This does not mean that things previously thought impossible are actually possible; these
+observations only indicate that CAP is not an appropriate tool for making statements about the
+possibility or impossibility of systems.
 
-Idea: distinguish consistency models by whether an operation requires network communication to
-complete before it can return. This framework focuses on operation latency as a function of network
-latency; disconnected operation is modelled with very high latency. Linearizability requires waiting
-on network for both reads and writes~\cite{Attiya1994gw}; sequential consistency requires waiting on
-network for writes, but not for reads~\cite{Attiya1994gw, Lipton1988uh}; causal consistency (and
-weaker) never require waiting on network~\cite{Mahajan2011wz}.
+What next? Perhaps an informally specified, rule-of-thumb \emph{CAP Principle} remains a useful tool
+for system design, though such a principle would need to clarify which of the many definitions of
+section~\ref{sec:definitions} it uses. However, a rule of thumb should not be mistaken for a
+theorem, unless formally proved. Perhaps a correct theorem can be salvaged by adopting a better
+formalism, but we do not attempt to prove this.
 
-Random notes follow:
+Instead, we refer to several existing results from the distributed systems literature (most of which
+in fact predate CAP, but do not seem to be widely known among proponents of CAP). We show how these
+results can help us reason about trade-offs between consistency and robustness to network faults
+more precisely than CAP ever allowed.
 
-Linearizability is a very strong consistency guarantee: most multicore CPUs do not provide
-linearizable access to memory, unless explicit memory barrier or lock instructions are
-used~\cite{Sewell2010fj}. The reason is performance: even though a multicore computer is not a
-distributed system, the latency of accessing RAM is so high that it would stall a CPU core for an
-unacceptably long amount of time.
+\subsection{Latency and availability}\label{sec:latency-availability}
 
-Abadi~\cite{Abadi2012hb} argues that the consistency/latency trade-off (which applies even when
-there is no partition) is as important as the consistency/availability trade-off (which only applies
-when there is a partition).
+As discussed in section~\ref{sec:availability}, the latency (response time) of operations is often
+important in practice. In most situations, a service that takes a week to respond might as well be
+unavailable. A simple timeout is the most common type of failure detector. By contrast, Gilbert and
+Lynch's definition of availability explicitly ignores latency.
 
-Latency percentiles are a popular metric for the performance of a service: for example, a service
-level agreement may specify that 99.9\% of requests must return a response within 500~ms.
+The problem with latency is that it is more difficult to model. Latency is influenced by many
+factors, especially the delay of packets on the network. Many computer networks (including Ethernet
+and the Internet) do not guarantee bounded delay, i.e.\ they allow packets to be delayed
+arbitrarily. Latencies and network delays are therefore typically described as probability
+distributions.
 
-disconnected operation: ATM network~\cite{Brewer2012tr}, file systems~\cite{Kistler1992bt}.
+On the other hand, network delay can model a wide range of faults. In network protocols that
+automatically retransmit lost packets (such as TCP), transient packet loss manifests itself to the
+application as increased delay. Even when the period of packet loss exceeds the TCP connection
+timeout, application-level protocols often retry failed requests until they succeed, so the
+effective latency of the operation is the time from the first attempt until the successful
+completion. Even network partitions can be modelled as large packet delays (up to the duration of
+the partition), provided that the duration of the partition is finite and lost packets are
+retransmitted an unbounded number of times.
+
+Abadi~\cite{Abadi2012hb} argues that there is a trade-off between consistency and latency, which
+applies even when there is no network partition, and which is as important as the
+consistency/availability trade-off described by CAP. We go further, and assert that availability
+should be modeled in terms of operation latency. For example, we could define a service as available
+if it meets its SLA (e.g.\ 99.9\% requests return successfully within 500~ms). This closely matches
+our intuitive understanding of availability.
+
+We can then reason about a service's tolerance of network problems by analyzing how operation
+latency is affected by changes in network delay, and whether this pushes operation latency over the
+limit set by the SLA. If a service can sustain low operation latency, even as network delay
+increases dramatically, it is more tolerant of network problems than a service whose operation
+latency increases.
+
+\subsection{How operation latency depends on network latency}\label{sec:network-dependence}
+
+To find a replacement for CAP with a latency-centric viewpoint we need to examine how operation
+latency is affected by network latency at different levels of consistency. In practice, this depends
+on the algorithms and implementation of the particular software being used. However, CAP
+demonstrated that there is also interest in theoretical results identifying the fundamental limits
+of what can be achieved, regardless of the particular algorithm in use.
+
+There are several impossibility results that set lower bounds on the operation latency that can be
+achieved, as a function of the network delay $d$. These results show that any algorithm guaranteeing
+a particular level of consistency cannot perform operations faster than the lower bound, and that
+lower bound depends on the chosen level of consistency and the type of operation. We summarize these
+results in table~\ref{tab:op-latency} and in the following sections.
+
+These analyses are similar to results in complexity theory, which describe the running time of an
+algorithm as a function of the size of its input. Here, we describe the latency of an operation as a
+function of the network delay.
+
+\begin{table}
+    \centering
+    \begin{tabular}{ccc}
+        Consistency level      & \textit{write} & \textit{read} \\
+                               & latency        & latency \\[3pt] \hline \noalign{\vspace{6pt}}
+        linearizability        & $O(d)$         & $O(d)$  \\[3pt]
+        sequential consistency & $O(d)$         & $O(1)$  \\[3pt]
+        causal consistency     & $O(1)$         & $O(1)$  \\[3pt] \hline
+    \end{tabular}
+    \caption{Lowest possible operation latency at various consistency levels, as a function of
+    network delay $d$.}
+    \label{tab:op-latency}
+\end{table}
+
+\subsubsection{Linearizability}
+
+Attiya and Welch~\cite{Attiya1994gw} show that any algorithm implementing a linearizable read-write
+register must have an operation latency of at least $u/2$, where $u$ is the uncertainty of delay in
+the network between replicas.\footnote{Attiya and Welch~\cite{Attiya1994gw} originally proved a
+bound of $u/4$ for read operations and $u/2$ for write operations. The $u/2$ bound for read
+operations is due to Mavronicolas and Roth~\cite{Mavronicolas1999eb}.}
+
+In this proof, network delay is assumed to be at most $d$ and at least $d-u$, so $u$ is the
+difference between the minimum and maximum network delay. In many networks, the maximum possible
+delay (due to network congestion or retransmitting lost packets) is much greater than the minimum
+possible delay (due to the speed of light), so $u \approx d$. If network delay is unbounded,
+operation latency is also unbounded.
+
+For the purpose of this survey, we can simplify the result to say that linearizability requires the
+latency of read and write operations to be proportional to the network delay $d$.
+
+\subsubsection{Sequential consistency}
+
+Lipton and Sandberg~\cite{Lipton1988uh} show that any algorithm implementing a sequentially
+consistent read-write register must have $|r| + |w| \geq d$, where $|r|$ is the latency of a read
+operation, $|w|$ is the latency of a write operation, and $d$ is the network delay. Mavronicolas
+and Roth~\cite{Mavronicolas1999eb} further develop this result.
+
+This lower bound provides a degree of choice for the application: for example, an application that
+performs more reads than writes can reduce the average operation latency by choosing $|r| = 0$ and
+$|w| \geq d$, whereas a write-heavy application might choose $|r| \geq d$ and $|w| = 0$. Attiya and
+Welch~\cite{Attiya1994gw} describe algorithms for both of these cases.
+
+Choosing $|r| = 0$ or $|w| = 0$ means the operation can complete without waiting for any network
+communication (it may still send messages, but need not wait for a response from other nodes). The
+latency of such an operation thus only depends on the local database algorithms: it might be
+constant-time $O(1)$, or it might be $O(\log n)$ where $n$ is the size of the database, but either
+way it is independent of the network delay $d$.
+
+In table~\ref{tab:op-latency} we have summarized sequential consistency as having fast reads and
+slow writes (constant-time reads, and write latency proportional to network delay), although these
+roles can be swapped if an application prefers fast writes and slow reads.
+
+\subsubsection{Causal consistency}
+
+If sequential consistency allows the latency of \emph{some} operations to be independent of network
+delay, which level of consistency allows \emph{all} operation latencies to be independent of the
+network? Mahajan, Alvisi and Dahlin~\cite{Mahajan2011wz} show that causal
+consistency~\cite{Ahamad1995gl} with eventual convergence is the strongest possible consistency
+guarantee with this property.
+
+Read Your Writes~\cite{Terry1994fp}, PRAM~\cite{Lipton1988uh} and other weak consistency models (all
+the way down to eventual consistency, which provides no safety property~\cite{Bailis2013jc}) are
+weaker than causal consistency, and thus achievable without waiting for the network. These
+consistency models are all ``available'' in Gilbert and Lynch's sense~\cite{Bailis2014vc}.
+
+If tolerance of network delay is the only consideration, causal consistency is the optimal
+consistency level. There may be other reasons for choosing weaker consistency levels (for example,
+the metadata overhead of tracking causality~\cite{CharronBost1991ec}), but these trade-offs are
+outside of the scope of this discussion, as they are also outside the scope of CAP.
+
+\subsection{Heterogeneous delays}
+
+A limitation of the results in section~\ref{sec:network-dependence} is that they assume the
+distribution of network delays is the same between every pair of nodes. This assumption is not true
+in general: for example, network delay between nodes in the same datacenter is likely to be much
+lower than between geographically distributed nodes communicating over WAN links.
+
+If we model network faults as periods of increased network delay
+(section~\ref{sec:latency-availability}), then a network partition is a situation in which the delay
+between nodes within each partition remains small, while the delay across partitions increases
+dramatically (up to the duration of the partition).
+
+For $O(d)$ algorithms, which of these different delays do we need to assume for $d$? The answer
+depends on the communication pattern of the algorithm. For example, the ABD algorithm
+(section~\ref{sec:abd-algorithm}) needs to wait for responses from a majority of replicas, so $d$ is
+the largest among the fastest majority.
+
+\subsection{Disconnected operation}\label{sec:disconnected}
+
+The big-O notation for operation latency ignores constant factors (such as the number of network
+round-trip times required by an algorithm), but it captures the essence of what we need to know for
+building systems that can tolerate network faults: what happens if network delay dramatically
+degrades? In a $O(d)$ algorithm, operation latency may increase to be as large as the duration of
+the fault (i.e.\ minutes or even hours), whereas a $O(1)$ algorithm remains unaffected.
+
+If the SLA calls for operation latencies that are significantly shorter than the duration of a
+fault, a $O(1)$ algorithm is required. In such algorithms, the time until replica convergence is
+still proportional to $d$, but convergence is decoupled from operation latency.
+
+Another way of looking at this is that a $O(1)$ algorithm supports \emph{disconnected} or
+\emph{offline operation}. This is an important use case in practice: for example, offline support
+has long been used in network file systems~\cite{Kistler1992bt} and automatic teller
+machines~\cite{Brewer2012tr}. Apps running on mobile devices also often need to support offline
+reading and writing of data, with any updates asynchronously propagated when an internet connection
+is next available.
+
+By thinking about the trade-off between replica consistency and network delay, we can integrate
+offline-capable client-side applications and server-side databases into a common conceptual
+framework.
+
+% An option for disconnected linearizability is to make a single replica the owner of an object.
+% This makes access slower for all other replicas, but allows constant-time access by the owner.
+% (Mavronicolas and Roth, 1992)
 
 % Brewer states that ``there is little reason to forfeit C or A when the system is not
 % partitioned''~\cite{Brewer2012ba}, yet many distributed datastores (e.g.\ Dynamo, Riak, Cassandra
@@ -458,27 +614,16 @@ disconnected operation: ATM network~\cite{Brewer2012tr}, file systems~\cite{Kist
 % Thus, these datastores that optimize for availability in the CAP sense can be thought to be always
 % operating in ``partition mode''.
 
+\section{Conclusion}
+
 Even though the CAP Theorem is false (so it is not a theorem), the informally defined CAP principle
 may still be useful for designing practical systems.
 
-Impossibility results are common in distributed systems~\cite{Lynch1989kj}, and there are a number
-of results that are 
-
-\cite{Attiya1995bm}
+\cite{Lynch1989kj}
 \cite{Fischer1985tt}
-
-Mahajan, Alvisi and Dahlin~\cite{Mahajan2011wz} show that causal consistency with convergence is the
-strongest possible consistency guarantee in a system with disconnected operation.
+\cite{Sewell2010fj}
 
 
-\section{Safety and liveness}
-
-Eventual consistency (convergence) is a liveness property: if a system stops accepting writes and
-sufficient communication occurs, then eventually the system reaches a state in which reads on all
-nodes return the same value for the same object~\cite{Mahajan2011wz}.
-
-Responding eventually to a request is a liveness property, but responding within some timeout is a
-safety property.
 
 {\footnotesize
 \bibliographystyle{plainnat}
