@@ -5,6 +5,7 @@
 \usepackage{doi}
 \usepackage{hyperref}
 \usepackage[numbers,sort]{natbib}
+\hyphenation{da-ta-cen-ter da-ta-cen-ters}
 \frenchspacing
 
 % People to send this to for review: Henry Robinson, Peter Bailis, Nicolas Liochon, Justin Sheehy
@@ -22,8 +23,9 @@ especially among the new generation of \emph{NoSQL} distributed databases. In th
 that the proof of CAP is incorrect, due to problems in the way it is formalized. We therefore
 propose that it should be referred to as \emph{CAP Principle} rather than \emph{CAP Theorem}.
 However, it is true that there is a trade-off between replica consistency guarantees and tolerance
-of network faults, and in this paper we discuss some alternative results from distributed systems
-theory that can help practitioners reason about such trade-offs in their systems.
+of network faults, and we propose an alternative \emph{delay-sensitivity} framework to help
+practitioners reason about this trade-off, by analyzing the sensitivity of operation latency to
+network delay.
 
 \section{Background}
 
@@ -35,24 +37,29 @@ copies of the data on different nodes, they may be inconsistent with each other,
 that is not designed to handle such inconsistencies may produce incorrect results.
 
 In order to provide a simpler programming model to application developers, the designers of
-distributed data systems have explored various consistency guarantees. Distributed consistency
-models such as linearizability~\cite{Herlihy1990jq}, sequential consistency~\cite{Lamport1979ky},
-causal consistency~\cite{Ahamad1995gl} and pipelined RAM (PRAM)~\cite{Lipton1988uh} encapsulate
-certain guarantees about the propagation of writes between the replicas of the database, and thus
-permit the programmer to ignore the problem of replica divergence to some degree. By analogy,
-transaction isolation models such as serializability, snapshot isolation~\cite{Berenson1995kj},
-repeatable read and read committed~\cite{Gray1976us} describe certain guarantees about isolation
-between concurrently executing transactions, and permit the programmer to ignore the problem of race
-conditions to some degree~\cite{Bailis2014vc}.
+distributed data systems have explored various consistency guarantees that can be implemented by the
+database infrastructure, such as linearizability~\cite{Herlihy1990jq}, sequential
+consistency~\cite{Lamport1979ky}, causal consistency~\cite{Ahamad1995gl} and pipelined RAM
+(PRAM)~\cite{Lipton1988uh}. When multiple processes execute operations on a shared storage
+abstraction such as a database, a consistency model describes what values are allowed to be returned
+by operations accessing the storage, depending on other operations executed previously or
+concurrently, and what values those operations returned.
+
+Similar concerns arise in the design of multiprocessor computers, which are not geographically
+distributed, but nevertheless present inconsistent views of memory to different threads, due to the
+various caches and buffers employed by modern CPU architectures. For example, x86 microprocessors
+provide a level of consistency that is weaker than sequential, but stronger than causal
+consistency~\cite{Sewell2010fj}. However, in this paper we focus our attention on distributed
+systems that must tolerate partial failures and unreliable network links.
 
 A strong consistency model like linearizability provides an easy-to-understand guarantee:
 informally, all operations behave as if they executed atomically on a \emph{single copy} of the
 data. However, this guarantee comes at the cost of reduced performance~\cite{Attiya1994gw} and fault
 tolerance~\cite{Davidson1985hv} compared to weaker consistency models. In particular, as we discuss
-in this paper, algorithms that ensure a strong consistency property among replicas are sensitive to
-message delays and faults in the network. Many real computer networks are prone to unbounded delays
-and dropped messages~\cite{Bailis2014jx}, making the fault tolerance of distributed consistency
-algorithms an important issue in practice.
+in this paper, algorithms that ensure stronger consistency properties among replicas are more
+sensitive to message delays and faults in the network. Many real computer networks are prone to
+unbounded delays and lost messages~\cite{Bailis2014jx}, making the fault tolerance of distributed
+consistency algorithms an important issue in practice.
 
 A particular kind of fault that has been studied since the 1970s is the \emph{network partition}, a
 communication fault that splits the network into subsets of nodes such that nodes in one subset
@@ -70,10 +77,10 @@ for \emph{Consistency}, \emph{Availability} and \emph{Partition tolerance}. Afte
 formalized by Gilbert and Lynch~\cite{Gilbert2002il, Gilbert2012bf} it became known as the
 \emph{CAP Theorem}.
 
-CAP was adopted by distributed systems practitioners to critique design
-decisions~\cite{Hodges2013tj}, and became a rallying cry of the NoSQL movement~\cite{Brewer2012ba}.
-It provoked a lively debate about trade-offs in data systems, partly due to its definitions of
-consistency, availability and partition tolerance being unclear~\cite{Robinson2010tp}.
+CAP became an influential idea in the NoSQL movement~\cite{Vogels2008ey}, and was adopted by
+distributed systems practitioners to critique design decisions~\cite{Hodges2013tj}. It provoked a
+lively debate about trade-offs in data systems, and encouraged system designers to challenge the
+received wisdom that strong consistency guarantees were essential for databases~\cite{Brewer2012ba}.
 
 The rest of this paper is organized as follows: in section~\ref{sec:definitions} we compare various
 definitions of consistency, availability and partition tolerance. We then examine the formalization
@@ -85,10 +92,11 @@ that are useful for reasoning about trade-offs in distributed systems.
 
 CAP was originally presented in the form of \emph{``consistency, availability, partition tolerance:
 pick any two''} (i.e.\ you can have CA, CP or AP, but not all three). Subsequent debates concluded
-that this formulation is misleading, since the distinction between CA and CP is
-unclear~\cite{Brewer2012ba, Hale2010we, Robinson2010tp}. Many authors now prefer the following
-formulation: if there is no network partition, a system can be both consistent and available; when a
-network partition occurs, a system must choose between either consistency (CP) or availability (AP).
+that this formulation is misleading~\cite{Brewer2012ba, Hale2010we, Robinson2010tp}, because the
+distinction between CA and CP is unclear, as detailed later in this section. Many authors now prefer
+the following formulation: if there is no network partition, a system can be both consistent and
+available; when a network partition occurs, a system must choose between either consistency (CP) or
+availability (AP).
 
 Some authors~\cite{Darcy2010ta, Liochon2015vt} define a CP system as one in which a majority of
 nodes on one side of a partition can continue operating normally, and a CA system as one that may
@@ -99,9 +107,9 @@ while a system that continues partially operating in the same situation is label
 (see section~\ref{sec:partitions}).
 
 Disagreement about the definitions of terms like \emph{availability} is the source of many
-misunderstandings about CAP. Unclear definitions also sabotage attempts to formalize the
-consistency/availability trade-off as a theorem. Indeed, there is considerable divergence between
-the informal CAP principle laid out by Brewer, and the formalization by Gilbert and Lynch.
+misunderstandings about CAP, and unclear definitions lead to problems with its formalization as a
+theorem. In sections~\ref{sec:availability} to \ref{sec:partitions} we survey various definitions
+that have been proposed.
 
 \subsection{Availability}\label{sec:availability}
 
@@ -123,7 +131,7 @@ observed availability during operation, compared to using a system that is not f
 
 \subsubsection{The A in CAP}\label{sec:a-in-cap}
 
-Does the A in CAP refer to a property of a system design, or to an observed metric during system
+Does the A in CAP refer to a property of an algorithm, or to an observed metric during system
 operation? This distinction is unclear. Brewer does not offer a precise definition of availability,
 but states that ``availability is obviously continuous from 0 to 100 percent''~\cite{Brewer2012ba},
 suggesting an observed metric. Fox and Brewer also use the term \emph{yield} to refer to the
@@ -132,12 +140,12 @@ timeout).
 
 On the other hand, Gilbert and Lynch~\cite{Gilbert2002il} write: ``For a distributed system to be
 continuously available, every request received by a non-failing node in the system must result in a
-response''. (This sentence appears to define a property of \emph{continuous availability}, but the
-rest of the paper does not refer to this ``continuous'' aspect.) In order to prove a result about
-systems in general, this definition interprets availability as a binary property of a system's
-design, not as an observed metric during system operation --- i.e.\ they define a system as being
-``available'' or ``unavailable'' based on its algorithms, not its operational status at some point
-in time.
+response''.\footnote{This sentence appears to define a property of \emph{continuous availability},
+but the rest of the paper does not refer to this ``continuous'' aspect.} In order to prove a result
+about systems in general, this definition interprets availability as a property of an algorithm, not
+as an observed metric during system operation -- i.e.\ they define a system as being ``available''
+or ``unavailable'' statically, based on its algorithms, not its operational status at some point in
+time.
 
 Note that Gilbert and Lynch's definition requires \emph{any} non-failed node to be able to generate
 valid responses, even if that node is completely isolated from the other nodes. This definition is
@@ -147,9 +155,15 @@ replica''~\cite[emphasis original]{Fox1999bs}.
 
 Gilbert and Lynch's requirement appears to be stronger, since Fox and Brewer's definition allows a
 node to refuse requests as long as another node can generate valid responses, and that node is
-reachable by the consumer. Indeed, many so-called highly available or fault-tolerant systems are
-``unavailable'' under Gilbert and Lynch's definition, even though they may have very high uptime in
-practice.
+reachable by the consumer.
+
+Many so-called highly available or fault-tolerant systems have very high uptime in practice, but are
+in fact ``unavailable'' under Gilbert and Lynch's definition: for example, in a system with an
+elected leader or primary node, if a client that cannot reach the leader due to a network fault, the
+client cannot perform any writes, even though it may be able to reach another replica. Conversely, a
+system that is ``available'' under Gilbert and Lynch's definition may nevertheless experience
+downtime (e.g.\ if the client is isolated from all of the replicas), so CAP-availability is no
+guarantee of service availability.
 
 \subsubsection{Failed nodes}\label{sec:failed-node-exception}
 
@@ -157,26 +171,28 @@ Another noteworthy aspect of Gilbert and Lynch's definition of availability is t
 applying only to \emph{non-failed} nodes. This allows the aforementioned definition of a CA system
 as one that fails catastrophically if a network partition occurs: if the partition causes all nodes
 to fail, then the availability requirement does not apply to any nodes, and thus it is trivially
-satisified, even if no node is able to respond to any requests. This is a valid definition, albeit
-somewhat counter-intuitive.
+satisified, even if no node is able to respond to any requests. This definition is logically sound,
+but somewhat counter-intuitive.
 
 \subsection{Consistency}\label{sec:consistency}
 
 Consistency is also an overloaded word in data systems: consistency in the sense of ACID is a very
 different property from consistency in CAP~\cite{Brewer2012ba}. In the distributed systems
-literature, consistency is usually understood as not one particular property, but as a range of
-properties with varying strengths of guarantee. Examples of such consistency models include
+literature, consistency is usually understood as not one particular property, but as a spectrum of
+models with varying strengths of guarantee. Examples of such consistency models include
 linearizability~\cite{Herlihy1990jq}, sequential consistency~\cite{Lamport1979ky}, causal
-consistency~\cite{Ahamad1995gl} and PRAM~\cite{Lipton1988uh}. A consistency model is a safety
-property regarding the propagation of updates between replicas.
+consistency~\cite{Ahamad1995gl} and PRAM~\cite{Lipton1988uh}.
 
-There is some overlap between distributed consistency models (which pertain to systems in which
-there are multiple replicas of the data) and transaction isolation models (which pertain to systems
-in which there are multiple concurrently executing transactions, usually assuming a single replica).
-Transaction isolation models include serializability~\cite{Bernstein1987va}, snapshot
-isolation~\cite{Berenson1995kj}, repeatable read and read committed~\cite{Gray1976us}. Bailis et
-al.~\cite{Bailis2014vc} demonstrate a unified framework for reasoning about both distributed
-consistency and transaction isolation in terms of CAP.
+There is some similarity between consistency models and \emph{transaction isolation models} such as
+serializability~\cite{Bernstein1987va}, snapshot isolation~\cite{Berenson1995kj}, repeatable read
+and read committed~\cite{Adya1999tx, Gray1976us}. Both describe restrictions on the values that
+operations may return, depending on other (prior or concurrent) operations. The difference is that
+transaction isolation models are usually formalized assuming a single replica, and operate at the
+granularity of transactions (each transaction may read or write multiple objects). Consistency
+models assume multiple replicas, but are usually defined in terms of single-object operations (not
+grouped into transactions). Bailis et al.~\cite{Bailis2014vc} demonstrate a unified framework for
+reasoning about both distributed consistency and transaction isolation in terms of CAP.
+
 
 \subsubsection{The C in CAP}\label{sec:c-in-cap}
 
@@ -184,9 +200,10 @@ Fox and Brewer~\cite{Fox1999bs} define the C in CAP as one-copy serializability
 (1SR)~\cite{Bernstein1987va}, whereas Gilbert and Lynch~\cite{Gilbert2002il} define it as
 linearizability. Those definitions are not identical, but fairly similar.\footnote{Linearizability
 is a recency guarantee, whereas 1SR is not. 1SR requires isolated execution of multi-object
-transactions, which linearizability does not. Both are ``unavailable'' in the CAP
-sense~\cite{Bailis2014vc}.} Both are safety properties~\cite{Alpern1985dg}, i.e.\ restrictions on
-the possible executions of the system, ensuring that certain situations never occur.
+transactions, which linearizability does not. Both require \emph{coordination}, in the sense of
+section~\ref{sec:disconnected}~\cite{Bailis2014vc}.} Both are safety properties~\cite{Alpern1985dg},
+i.e.\ restrictions on the possible executions of the system, ensuring that certain situations never
+occur.
 
 In the case of linearizability, the situation that may not occur is a \emph{stale read}: stated
 informally, if read operation $r$ begins after write operation $w$ has completed, and there are no
@@ -249,7 +266,7 @@ occur.''
 
 If an algorithm assumes the absence of partitions, and is nevertheless subjected to a partition, it
 may violate its guarantees in arbitrarily undefined ways (including failing to respond even after
-the partition is repaired, or deleting arbitrary amounts of data). Even though it may seem that such
+the partition is healed, or deleting arbitrary amounts of data). Even though it may seem that such
 arbitrary failure semantics are not very useful, various systems exhibit such behavior in
 practice~\cite{Kingsbury2014tk, Kingsbury2015uk}. Making networks highly reliable is very
 expensive~\cite{Bailis2014jx}, so most distributed programs must assume that partitions will occur
@@ -273,7 +290,7 @@ number of attempts~\cite{Cachin2011wt}.
 
 We argue that fair-loss links are a good model of most networks in practice: faults occur randomly
 (not due to malicious activity); messages are lost while the fault is occurring; the fault lasts for
-some finite duration (perhaps seconds, perhaps hours), and eventually it is repaired (perhaps after
+some finite duration (perhaps seconds, perhaps hours), and eventually it is healed (perhaps after
 human intervention). There is no malicious actor in the network who can cause systematic message
 loss over unlimited periods of time -- such malicious actors are usually only assumed in the design
 of Byzantine fault tolerant algorithms.
@@ -319,7 +336,7 @@ satisfying Gilbert and Lynch's definition of availability.
 
 If ABD is used with fair-loss links, communication is made reliable by retrying messages an
 unbounded number of times until they are delivered. Under this assumption, ABD executions of
-\emph{read} and \emph{write} operations always terminate provided that a majority of nodes is not
+\emph{read} and \emph{write} operations always terminate, provided that a majority of nodes is not
 faulty. As the CAP definition of availability only requires operations to terminate (there is no
 limit on the response time, as long as it is finite), this meets the CAP definition of availability.
 
@@ -350,15 +367,16 @@ The proof is therefore false with regard to partitions of finite duration.
 
 Only if the partition is of infinite duration, $A$ is forced to make a choice\footnote{How the
 algorithm would make that choice in the absence of clocks -- since this is an asynchronous system
-model -- is unclear.} between waiting until the partition heals (which never happens, thus violating
-availability) and exhibiting the execution in the proof of Theorem 1 (thus violating
+model -- is unclear. This argument applies better to Theorem 2, which uses a partially synchronous
+model (section~\ref{sec:theorem2}).} between waiting until the partition heals (which never happens,
+thus violating availability) and exhibiting the execution in the proof of Theorem 1 (thus violating
 linearizability). We can conclude that the proof of Theorem 1 is only valid in the case of an
 infinite partition.
 
-As previously mentioned, infinite partitions cannot occur in fair-loss links, and are usually
-considered a Byzantine failure mode. As discussions of CAP are usually in the context of
-non-Byzantine system models, we might conclude that Theorem 1 is false in the context in which it is
-normally applied.
+Infinite partitions cannot occur in a system with fair-loss links, and are usually considered to be
+a Byzantine fault (see section~\ref{sec:fairloss}). As discussions of CAP are usually in the context
+of non-Byzantine system models, we might conclude that Theorem 1 is false in the context in which it
+is normally applied.
 
 \subsubsection{Linearizability vs. eventual consistency}
 
@@ -401,6 +419,20 @@ and the execution described in the proof need not be exhibited by any algorithm 
 partition of finite duration. For a partition of infinite duration, the aforementioned observation
 about eventual consistency holds.
 
+Note that although systems in the partially synchronous model have the ability to generate timeouts,
+Gilbert and Lynch's definition of availability does not specify any timeout: it requires requests to
+return a response within some unbounded but finite time. This definition of availability is a pure
+liveness property, not a safety property~\cite{Alpern1985dg}.
+
+For this reason, if a linearizable algorithm encounters a network partition, it is acceptable for
+the algorithm to simply wait for the partition to be healed: at any point in time, there is still
+hope that the partition will be healed in future, and so the availability property may yet be
+satisfied. In order to force the non-linearizable execution given by Gilbert and Lynch, the
+definition of availability would have to be extended to include a deadline by which a response must
+be received, which fundamentally changes the problem. We discuss such a latency-sensitive definition
+of availability in section~\ref{sec:alternatives}.
+
+
 % \subsection{Definition 3 and Theorem 4}\label{sec:theorem4}
 %
 % Gilbert and Lynch's Definition~3 describes a new replica consistency model called \emph{Delayed-$t$
@@ -432,10 +464,11 @@ section~\ref{sec:definitions} it uses. However, a rule of thumb should not be mi
 theorem, unless formally proved. Perhaps a correct theorem can be salvaged by adopting a better
 formalism, but we do not attempt to prove this.
 
-Instead, we refer to several existing results from the distributed systems literature (most of which
-in fact predate CAP, but do not seem to be widely known among proponents of CAP). We show how these
-results can help us reason about trade-offs between consistency and robustness to network faults
-more precisely than CAP ever allowed.
+Instead, in this section we develop an alternative framework for reasoning about trade-offs between
+consistency and robustness to network faults, called \emph{delay-sensitivity}. It is based on to
+several existing results from the distributed systems literature (most of which in fact predate CAP,
+but do not seem to be widely known among proponents of CAP). The delay-sensitivity framework is
+introduced in sections~\ref{sec:latency-availability} to \ref{sec:terminology}.
 
 \subsection{Latency and availability}\label{sec:latency-availability}
 
@@ -452,9 +485,9 @@ distributions.
 
 On the other hand, network delay can model a wide range of faults. In network protocols that
 automatically retransmit lost packets (such as TCP), transient packet loss manifests itself to the
-application as increased delay. Even when the period of packet loss exceeds the TCP connection
-timeout, application-level protocols often retry failed requests until they succeed, so the
-effective latency of the operation is the time from the first attempt until the successful
+application as temporarily increased delay. Even when the period of packet loss exceeds the TCP
+connection timeout, application-level protocols often retry failed requests until they succeed, so
+the effective latency of the operation is the time from the first attempt until the successful
 completion. Even network partitions can be modelled as large packet delays (up to the duration of
 the partition), provided that the duration of the partition is finite and lost packets are
 retransmitted an unbounded number of times.
@@ -462,9 +495,10 @@ retransmitted an unbounded number of times.
 Abadi~\cite{Abadi2012hb} argues that there is a trade-off between consistency and latency, which
 applies even when there is no network partition, and which is as important as the
 consistency/availability trade-off described by CAP. We go further, and assert that availability
-should be modeled in terms of operation latency. For example, we could define a service as available
-if it meets its SLA (e.g.\ 99.9\% requests return successfully within 500~ms). This closely matches
-our intuitive understanding of availability.
+should be modeled in terms of operation latency. For example, we could define the availability of a
+service as the proportion of requests that meet some latency bound (e.g.\ returning successfully
+within 500~ms, as defined by a SLA). This empirically-founded definition of availability closely
+matches our intuitive understanding.
 
 We can then reason about a service's tolerance of network problems by analyzing how operation
 latency is affected by changes in network delay, and whether this pushes operation latency over the
@@ -472,7 +506,7 @@ limit set by the SLA. If a service can sustain low operation latency, even as ne
 increases dramatically, it is more tolerant of network problems than a service whose operation
 latency increases.
 
-\subsection{How operation latency depends on network latency}\label{sec:network-dependence}
+\subsection{How operation latency depends on network delay}\label{sec:network-dependence}
 
 To find a replacement for CAP with a latency-centric viewpoint we need to examine how operation
 latency is affected by network latency at different levels of consistency. In practice, this depends
@@ -480,11 +514,10 @@ on the algorithms and implementation of the particular software being used. Howe
 demonstrated that there is also interest in theoretical results identifying the fundamental limits
 of what can be achieved, regardless of the particular algorithm in use.
 
-There are several impossibility results that set lower bounds on the operation latency that can be
-achieved, as a function of the network delay $d$. These results show that any algorithm guaranteeing
-a particular level of consistency cannot perform operations faster than the lower bound, and that
-lower bound depends on the chosen level of consistency and the type of operation. We summarize these
-results in table~\ref{tab:op-latency} and in the following sections.
+Several existing impossibility results establish lower bounds on the operation latency as a function
+of the network delay $d$. These results show that any algorithm guaranteeing a particular level of
+consistency cannot perform operations faster than some lower bound. We summarize these results in
+table~\ref{tab:op-latency} and in the following sections.
 
 These analyses are similar to results in complexity theory, which describe the running time of an
 algorithm as a function of the size of its input. Here, we describe the latency of an operation as a
@@ -509,8 +542,9 @@ function of the network delay.
 Attiya and Welch~\cite{Attiya1994gw} show that any algorithm implementing a linearizable read-write
 register must have an operation latency of at least $u/2$, where $u$ is the uncertainty of delay in
 the network between replicas.\footnote{Attiya and Welch~\cite{Attiya1994gw} originally proved a
-bound of $u/4$ for read operations and $u/2$ for write operations. The $u/2$ bound for read
-operations is due to Mavronicolas and Roth~\cite{Mavronicolas1999eb}.}
+bound of $u/2$ for write operations (assuming two writer processes and one reader), and a bound of
+$u/4$ for read operations (two readers, one writer). The $u/2$ bound for read operations is due to
+Mavronicolas and Roth~\cite{Mavronicolas1999eb}.}
 
 In this proof, network delay is assumed to be at most $d$ and at least $d-u$, so $u$ is the
 difference between the minimum and maximum network delay. In many networks, the maximum possible
@@ -518,8 +552,10 @@ delay (due to network congestion or retransmitting lost packets) is much greater
 possible delay (due to the speed of light), so $u \approx d$. If network delay is unbounded,
 operation latency is also unbounded.
 
-For the purpose of this survey, we can simplify the result to say that linearizability requires the
-latency of read and write operations to be proportional to the network delay $d$.
+For the purposes of this survey, we can simplify the result to say that linearizability requires the
+latency of read and write operations to be proportional to the network delay $d$. This is indicated
+in table~\ref{tab:op-latency} as $O(d)$ latency for reads and writes. We call these operations
+\emph{delay-sensitive}, as their latency is sensitive to changes in network delay.
 
 \subsubsection{Sequential consistency}
 
@@ -531,35 +567,38 @@ and Roth~\cite{Mavronicolas1999eb} further develop this result.
 This lower bound provides a degree of choice for the application: for example, an application that
 performs more reads than writes can reduce the average operation latency by choosing $|r| = 0$ and
 $|w| \geq d$, whereas a write-heavy application might choose $|r| \geq d$ and $|w| = 0$. Attiya and
-Welch~\cite{Attiya1994gw} describe algorithms for both of these cases.
+Welch~\cite{Attiya1994gw} describe algorithms for both of these cases (the $|r| = 0$ case is similar
+to the Zab algorithm used by Apache ZooKeeper~\cite{Junqueira2011jc}).
 
 Choosing $|r| = 0$ or $|w| = 0$ means the operation can complete without waiting for any network
 communication (it may still send messages, but need not wait for a response from other nodes). The
 latency of such an operation thus only depends on the local database algorithms: it might be
 constant-time $O(1)$, or it might be $O(\log n)$ where $n$ is the size of the database, but either
-way it is independent of the network delay $d$.
+way it is independent of the network delay $d$, so we call it \emph{delay-independent}.
 
-In table~\ref{tab:op-latency} we have summarized sequential consistency as having fast reads and
-slow writes (constant-time reads, and write latency proportional to network delay), although these
-roles can be swapped if an application prefers fast writes and slow reads.
+In table~\ref{tab:op-latency}, sequential consistency is described as having fast reads and slow
+writes (constant-time reads, and write latency proportional to network delay), although these roles
+can be swapped if an application prefers fast writes and slow reads.
 
 \subsubsection{Causal consistency}
 
 If sequential consistency allows the latency of \emph{some} operations to be independent of network
 delay, which level of consistency allows \emph{all} operation latencies to be independent of the
-network? Mahajan, Alvisi and Dahlin~\cite{Mahajan2011wz} show that causal
+network? Recent results~\cite{Attiya2015dm, Mahajan2011wz} show that causal
 consistency~\cite{Ahamad1995gl} with eventual convergence is the strongest possible consistency
-guarantee with this property.
+guarantee with this property.\footnote{There are a few variants of causal consistency, such as
+\emph{real time causal}~\cite{Mahajan2011wz}, \emph{causal+}~\cite{Lloyd2011hz} and
+\emph{observable causal}~\cite{Attiya2015dm} consistency. They have subtle differences, but we do
+not have space in this paper to compare them in detail.}
 
 Read Your Writes~\cite{Terry1994fp}, PRAM~\cite{Lipton1988uh} and other weak consistency models (all
 the way down to eventual consistency, which provides no safety property~\cite{Bailis2013jc}) are
-weaker than causal consistency, and thus achievable without waiting for the network. These
-consistency models are all ``available'' in Gilbert and Lynch's sense~\cite{Bailis2014vc}.
+weaker than causal consistency, and thus achievable without waiting for the network.
 
 If tolerance of network delay is the only consideration, causal consistency is the optimal
 consistency level. There may be other reasons for choosing weaker consistency levels (for example,
-the metadata overhead of tracking causality~\cite{CharronBost1991ec}), but these trade-offs are
-outside of the scope of this discussion, as they are also outside the scope of CAP.
+the metadata overhead of tracking causality~\cite{CharronBost1991ec, Attiya2015dm}), but these
+trade-offs are outside of the scope of this discussion, as they are also outside the scope of CAP.
 
 \subsection{Heterogeneous delays}
 
@@ -574,32 +613,93 @@ between nodes within each partition remains small, while the delay across partit
 dramatically (up to the duration of the partition).
 
 For $O(d)$ algorithms, which of these different delays do we need to assume for $d$? The answer
-depends on the communication pattern of the algorithm. For example, the ABD algorithm
-(section~\ref{sec:abd-algorithm}) needs to wait for responses from a majority of replicas, so $d$ is
-the largest among the fastest majority.
+depends on the communication pattern of the algorithm.
 
-\subsection{Disconnected operation}\label{sec:disconnected}
+\subsubsection{Modeling network topology}
 
-The big-O notation for operation latency ignores constant factors (such as the number of network
-round-trip times required by an algorithm), but it captures the essence of what we need to know for
+For example, a replication algorithm that uses a single leader or primary node requires all write
+requests to contact the primary, and thus $d$ in this case is the network delay between the client
+and the leader (possibly via other nodes). In a geographically distributed system, if client and
+leader are in different locations, $d$ includes WAN links. If the client is temporarily partitioned
+from the leader, $d$ increases up to the duration of the partition.
+
+By contrast, the ABD algorithm (section~\ref{sec:abd-algorithm}) waits for responses from a majority
+of replicas, so $d$ is the largest among the majority of replicas that are fastest to respond. If a
+minority of replicas is temporarily partitioned from the client, the operation latency remains
+independent of the partition duration.
+
+Another possibility is to treat network delay within the same datacenter, $d_\textit{local}$,
+differently from network delay over WAN links, $d_\textit{remote}$, because usually
+$d_\textit{local} \ll d_\textit{remote}$. Systems such as COPS~\cite{Lloyd2011hz}, which place a
+leader in each datacenter, provide linearizable operations within one datacenter (requiring
+$O(d_\textit{local})$ latency), and causal consistency across datacenters (making the request
+latency independent of $d_\textit{remote}$).
+
+
+\subsection{Delay-independent operations}\label{sec:disconnected}
+
+The big-$O$ notation for operation latency ignores constant factors (such as the number of network
+round-trips required by an algorithm), but it captures the essence of what we need to know for
 building systems that can tolerate network faults: what happens if network delay dramatically
-degrades? In a $O(d)$ algorithm, operation latency may increase to be as large as the duration of
-the fault (i.e.\ minutes or even hours), whereas a $O(1)$ algorithm remains unaffected.
+degrades? In a delay-sensitive $O(d)$ algorithm, operation latency may increase to be as large as
+the duration of the network interruption (i.e.\ minutes or even hours), whereas a delay-independent
+$O(1)$ algorithm remains unaffected.
 
-If the SLA calls for operation latencies that are significantly shorter than the duration of a
-fault, a $O(1)$ algorithm is required. In such algorithms, the time until replica convergence is
-still proportional to $d$, but convergence is decoupled from operation latency.
+If the SLA calls for operation latencies that are significantly shorter than the expected duration
+of network interruptions, delay-independent algorithms are required. In such algorithms, the time
+until replica convergence is still proportional to $d$, but convergence is decoupled from operation
+latency. Put another way, delay-independent algorithms support \emph{disconnected} or \emph{offline
+operation}. Disconnected operation has long been used in network file systems~\cite{Kistler1992bt}
+and automatic teller machines~\cite{Brewer2012tr}.
 
-Another way of looking at this is that a $O(1)$ algorithm supports \emph{disconnected} or
-\emph{offline operation}. This is an important use case in practice: for example, offline support
-has long been used in network file systems~\cite{Kistler1992bt} and automatic teller
-machines~\cite{Brewer2012tr}. Apps running on mobile devices also often need to support offline
-reading and writing of data, with any updates asynchronously propagated when an internet connection
-is next available.
+For example, consider a calendar application running on a mobile device: a user may travel through a
+tunnel or to a remote location where there is no cellular network coverage. For a mobile device,
+regular network interruptions are expected, and they may last for days. During this time, the user
+should still be able to interact with the calendar app, checking their schedule and adding events
+(with any changes asynchronously propagated when an internet connection is next available).
 
-By thinking about the trade-off between replica consistency and network delay, we can integrate
-offline-capable client-side applications and server-side databases into a common conceptual
-framework.
+However, even in environments with fast and reliable network connectivity, delay-independent
+algorithms have been shown to have performance and scalability benefits: in this context, they are
+known as \emph{coordination-free}~\cite{Bailis2014th} or \emph{ALPS}~\cite{Lloyd2011hz} systems.
+Many popular database integrity constraints can be implemented without synchronous coordination
+between replicas~\cite{Bailis2014th}.
+
+\subsection{Proposed terminology}\label{sec:terminology}
+
+Much of the confusion around CAP is due to the ambiguous, counter-intuitive and contradictory
+definitions of terms such as \emph{availability}, as discussed in section~\ref{sec:definitions}. In
+order to improve the situation and reduce misunderstandings, there is a need to standardize
+terminology with simple, formal and correct definitions that match the intuitions of practitioners.
+
+Building upon the observations above and the results cited in section~\ref{sec:network-dependence},
+we propose the following definitions as a first draft of a \emph{delay-sensitivity framework} for
+reasoning about consistency and availability trade-offs. These definitions are informal and intended
+as a starting point for further discussion.
+
+\begin{description}
+\item[Availability] is an \emph{empirical metric}, not a property of an algorithm. It is defined as
+    the percentage of successful requests (returning a non-error response within a predefined
+    latency bound) over some period of system operation.
+\item[Delay-sensitive] describes algorithms or operations that need to wait for network
+    communication to complete, i.e.\ which have latency proportional to network delay. The opposite
+    is \emph{delay-independent}. Systems must specify the nature of the sensitivity (e.g.\ an
+    operation may be sensitive to intra-datacenter delay but independent of inter-datacenter delay).
+    A fully delay-independent system supports \emph{disconnected (offline) operation}.
+\item[Network faults] is a catch-all for packet loss (both transient and long-lasting) and unusually
+    large packet delay. \emph{Network partitions} are just one particular type of network fault; in
+    most cases, systems should plan for all kinds of network fault, and not only partitions. As
+    long as lost packets or failed requests are retried, they can be modeled as large network delay.
+\item[Fault tolerance] is used in preference to \emph{high availability} or \emph{partition
+    tolerance}. The maximum fault that can be tolerated must be specified (e.g.\ ``the algorithm can
+    tolerate up to a minority of replicas crashing or disconnecting''), and the description must
+    also state what happens if more faults occur than the system can tolerate (e.g.\ all requests
+    return an error, or a consistency property is violated).
+\item[Consistency] refers to a spectrum of different \emph{consistency models} (including
+    linearizability and causal consistency), not one particular consistency model. When a particular
+    consistency model such as linearizability is intended, it is referred to by its usual name. The
+    term \emph{strong consistency} is vague, and may refer to linearizability, sequential
+    consistency or one-copy serializability.
+\end{description}
 
 % An option for disconnected linearizability is to make a single replica the owner of an object.
 % This makes access slower for all other replicas, but allows constant-time access by the owner.
@@ -628,15 +728,15 @@ guarantees, e.g.\ in the NoSQL movement. However, we believe that CAP has now re
 usefulness; we recommend that it should be relegated to the history of distributed systems, and no
 longer be used for justifying design decisions.
 
-As an alternative to CAP, we propose a simple framework for reasoning about trade-offs between
-consistency guarantees and tolerance of network faults in a replicated database. Every operation is
-categorized as either $O(d)$, if its latency is proportional to network delay, or $O(1)$, if it is
-independent of network delay. On the assumption that lost packets are retransmitted an unbounded
-number of times, we can model network faults (including partitions) as periods of greatly increased
-delay. The algorithm's dependency on network delay determines whether the system can still meet its
-service level agreement (SLA) when a network fault occurs.
+As an alternative to CAP, we propose a simple \emph{delay-sensitivity} framework for reasoning about
+trade-offs between consistency guarantees and tolerance of network faults in a replicated database.
+Every operation is categorized as either $O(d)$, if its latency is sensitive to network delay, or
+$O(1)$, if it is independent of network delay. On the assumption that lost packets are retransmitted
+an unbounded number of times, we can model network faults (including partitions) as periods of
+greatly increased delay. The algorithm's sensitivity to network delay determines whether the system
+can still meet its service level agreement (SLA) when a network fault occurs.
 
-The actual dependency of a system on network delay depends on its implementation, but -- in keeping
+The actual sensitivity of a system to network delay depends on its implementation, but -- in keeping
 with the goal of CAP -- we can prove that certain levels of consistency cannot be achieved without
 making operation latency proportional to network delay. These theoretical lower bounds are
 summarized in table~\ref{tab:op-latency}. We have not proved any new results in this paper, but
@@ -645,7 +745,9 @@ predating CAP).
 
 We hope that by being more rigorous about the implications of different consistency levels on
 performance and fault tolerance, we can encourage designers of distributed data systems to continue
-the exploration of the design space.
+the exploration of the design space. And we also hope that by adopting simple, correct and intuitive
+terminology, we can help guide application developers towards the storage technologies that are most
+appropriate for their use cases.
 
 \subsection*{Acknowledgements}
 
