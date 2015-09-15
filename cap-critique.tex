@@ -4,11 +4,15 @@
 \usepackage[hyphens]{url}
 \usepackage{doi}
 \usepackage{hyperref}
+\usepackage[hyphenbreaks]{breakurl} % Fix URL line breaking when using dvips (e.g. arxiv.org)
 \usepackage[numbers,sort]{natbib}
+\usepackage{amssymb}
+\usepackage{amsthm} % Theorems
+\newtheorem{theorem}{Assertion}
+\newtheorem{corollary}[theorem]{Corollary}
 \hyphenation{da-ta-cen-ter da-ta-cen-ters}
 \frenchspacing
 
-% People to send this to for review: Henry Robinson, Peter Bailis, Nicolas Liochon, Justin Sheehy
 \begin{document}
 \sloppy
 \date{} % No date
@@ -18,14 +22,17 @@
 
 \subsection*{Abstract}
 
-The so-called \emph{CAP Theorem} is a frequently cited impossibility result in distributed systems,
-especially among the new generation of \emph{NoSQL} distributed databases. In this paper we show
-that the proof of CAP is incorrect, due to problems in the way it is formalized. We therefore
-propose that it should be referred to as \emph{CAP Principle} rather than \emph{CAP Theorem}.
-However, it is true that there is a trade-off between replica consistency guarantees and tolerance
-of network faults, and we propose an alternative \emph{delay-sensitivity} framework to help
-practitioners reason about this trade-off, by analyzing the sensitivity of operation latency to
-network delay.
+The \emph{CAP Theorem} is a frequently cited impossibility result in distributed systems, especially
+among \emph{NoSQL} distributed databases. In this paper we survey some of the confusion about the
+meaning of CAP, including inconsistencies and ambiguities in its definitions, and we highlight some
+problems in its formalization and proofs. CAP is often interpreted as proof that eventually
+consistent databases have better availability properties than strongly consistent databases;
+although there is some truth in this, we show that more careful reasoning is required. These
+problems cast doubt on the utility of CAP as a tool for reasoning about trade-offs in practical
+systems. As alternative to CAP, we propose a \emph{delay-sensitivity} framework, which analyzes the
+sensitivity of operation latency to network delay, and which may help practitioners reason about the
+trade-offs between consistency guarantees and tolerance of network faults.
+
 
 \section{Background}
 
@@ -43,7 +50,7 @@ consistency~\cite{Lamport1979ky}, causal consistency~\cite{Ahamad1995gl} and pip
 (PRAM)~\cite{Lipton1988uh}. When multiple processes execute operations on a shared storage
 abstraction such as a database, a consistency model describes what values are allowed to be returned
 by operations accessing the storage, depending on other operations executed previously or
-concurrently, and what values those operations returned.
+concurrently, and the return values of those operations.
 
 Similar concerns arise in the design of multiprocessor computers, which are not geographically
 distributed, but nevertheless present inconsistent views of memory to different threads, due to the
@@ -63,11 +70,11 @@ consistency algorithms an important issue in practice.
 
 A particular kind of fault that has been studied since the 1970s is the \emph{network partition}, a
 communication fault that splits the network into subsets of nodes such that nodes in one subset
-cannot communicate with nodes in another~\cite{Johnson1975we, Lindsay1979wv, Davidson1985hv}. As
-long as the partition exists, any data modifications made in one subset of nodes cannot be visible
-to nodes in another subset, since all messages between them are lost. Thus, an algorithm that
-maintains the illusion of a single copy may have to delay operations until the partition is healed,
-to avoid the risk of introducing inconsistent data in different subsets.
+cannot communicate with nodes in another~\cite{Johnson1975we, Lindsay1979wv, Fischer1982hc, Davidson1985hv}.
+As long as the partition exists, any data modifications made in one subset of nodes cannot be
+visible to nodes in another subset, since all messages between them are lost. Thus, an algorithm
+that maintains the illusion of a single copy may have to delay operations until the partition is
+healed, to avoid the risk of introducing inconsistent data in different subsets of nodes.
 
 This trade-off was already known in 1975~\cite{Johnson1975we}, but it was rediscovered in the early
 2000s, when the web's growing commercial popularity made geographic distribution and high
@@ -84,9 +91,9 @@ received wisdom that strong consistency guarantees were essential for databases~
 
 The rest of this paper is organized as follows: in section~\ref{sec:definitions} we compare various
 definitions of consistency, availability and partition tolerance. We then examine the formalization
-of CAP by Gilbert and Lynch~\cite{Gilbert2002il} in section~\ref{sec:proofs}, and show that the
-proofs are incorrect. Finally, in section~\ref{sec:alternatives} we discuss some alternatives to CAP
-that are useful for reasoning about trade-offs in distributed systems.
+of CAP by Gilbert and Lynch~\cite{Gilbert2002il} in section~\ref{sec:proofs}, and highlight problems
+in the proofs. Finally, in section~\ref{sec:alternatives} we discuss some alternatives to CAP that
+are useful for reasoning about trade-offs in distributed systems.
 
 \section{CAP Theorem Definitions}\label{sec:definitions}
 
@@ -158,12 +165,29 @@ node to refuse requests as long as another node can generate valid responses, an
 reachable by the consumer.
 
 Many so-called highly available or fault-tolerant systems have very high uptime in practice, but are
-in fact ``unavailable'' under Gilbert and Lynch's definition: for example, in a system with an
-elected leader or primary node, if a client that cannot reach the leader due to a network fault, the
-client cannot perform any writes, even though it may be able to reach another replica. Conversely, a
-system that is ``available'' under Gilbert and Lynch's definition may nevertheless experience
-downtime (e.g.\ if the client is isolated from all of the replicas), so CAP-availability is no
-guarantee of service availability.
+in fact ``unavailable'' under Gilbert and Lynch's definition~\cite{Kim1984bl}: for example, in a
+system with an elected leader or primary node, if a client that cannot reach the leader due to a
+network fault, the client cannot perform any writes, even though it may be able to reach another
+replica. Conversely, a system that is ``available'' under Gilbert and Lynch's definition may
+nevertheless experience downtime (e.g.\ if the client is isolated from all of the replicas), so
+CAP-availability is no guarantee of service availability.
+
+\subsubsection{No maximum latency}\label{sec:no-max-latency}
+
+Note that Gilbert and Lynch's definition of availability does not specify any upper bound on
+operation latency: it only requires requests to \emph{eventually} return a response within some
+unbounded but finite time. This is convenient for proof purposes, but does not closely match our
+intuitive notion of availability (in most situations, a service that takes a week to respond might
+as well be considered unavailable).
+
+This definition of availability is a pure liveness property, not a safety
+property~\cite{Alpern1985dg}: that is, at any point in time, if the response has not yet arrived,
+there is still hope that the availability property might still be fulfilled, because the response
+may yet arrive -- it is never too late. This aspect of the definition will be important in
+section~\ref{sec:proofs}, when we examine Gilbert and Lynch's proofs in more detail.
+
+(In section~\ref{sec:alternatives} we will discuss a definition of availability that takes latency
+into account.)
 
 \subsubsection{Failed nodes}\label{sec:failed-node-exception}
 
@@ -206,11 +230,12 @@ i.e.\ restrictions on the possible executions of the system, ensuring that certa
 occur.
 
 In the case of linearizability, the situation that may not occur is a \emph{stale read}: stated
-informally, if read operation $r$ begins after write operation $w$ has completed, and there are no
-intervening writes, then $r$ must return the value written by $w$. Gilbert and Lynch observe that if
-$r$ and $w$ occur on different nodes, and those nodes cannot communicate during the time when those
-operations are being executed, then the safety property cannot be satisfied, because $r$ cannot know
-about the value of $w$.
+informally, once a write operation has completed or some read operation has returned a new value,
+all following read operations must return the new value, until it is overwritten by another write
+operation. Gilbert and Lynch observe that if the write and read operations occur on different nodes,
+and those nodes cannot communicate during the time when those operations are being executed, then
+the safety property cannot be satisfied, because the read operation cannot know about the value
+written.
 
 The C of CAP is sometimes referred to as \emph{strong consistency} (a term that is not formally
 defined), and contrasted with \emph{eventual consistency}~\cite{Terry1994fp, Vogels2008ey, Bailis2013jc},
@@ -308,11 +333,10 @@ section~\ref{sec:proofs}.
 \section{The CAP Proofs}\label{sec:proofs}
 
 In this section, we build upon the discussion of definitions in the last section, and examine the
-proofs of the purported theorems and corollary of Gilbert and Lynch~\cite{Gilbert2002il}
-(collectively known as the ``proof of the CAP theorem''). We demonstrate that each of these proofs
-is false.
+proofs of the theorems of Gilbert and Lynch~\cite{Gilbert2002il}. We highlight some problems in the
+reasoning of the proofs, and then suggest a more precise formalization.
 
-\subsection{Theorem 1}\label{sec:theorem1}
+\subsection{Theorems 1 and 2}\label{sec:theorem1}
 
 Gilbert and Lynch's Theorem 1 is stated as follows:
 
@@ -320,162 +344,273 @@ Gilbert and Lynch's Theorem 1 is stated as follows:
 guarantees the following properties:}
 \begin{itemize}
 \item \emph{Availability}
-\item \emph{Atomic consistency}\footnote{\emph{Atomic consistency} is synonymous with linearizability, and
-it is unrelated to the A in ACID.}
+\item \emph{Atomic consistency}\footnote{In this context, \emph{atomic consistency} is synonymous
+with linearizability, and it is unrelated to the A in ACID.}
 \end{itemize}
 \emph{in all fair executions (including those in which messages are lost).}
 
-\subsubsection{Counterexample}\label{sec:abd-algorithm}
+Theorem 2 is similar, but specified in a system model with bounded network delay. The discussion in
+this section~\ref{sec:theorem1} applies to both theorems.
 
-The simplest way of showing Theorem 1 to be false is by giving a counterexample. The ABD algorithm,
-published by Attiya, Bar-Noy and Dolev five years before CAP was proposed~\cite{Attiya1995bm},
-implements an atomic (linearizable) read-write register\footnote{ABD~\cite{Attiya1995bm} is an
-algorithm for a single-writer multi-reader register. It was extended to the multi-writer case by
-Lynch and Shvartsman~\cite{Lynch1997gr}.} in an unreliable asynchronous network, while also
-satisfying Gilbert and Lynch's definition of availability.
+\subsubsection{Availability of failed nodes}\label{sec:failed-node-trivial}
 
-If ABD is used with fair-loss links, communication is made reliable by retrying messages an
-unbounded number of times until they are delivered. Under this assumption, ABD executions of
-\emph{read} and \emph{write} operations always terminate, provided that a majority of nodes is not
-faulty. As the CAP definition of availability only requires operations to terminate (there is no
-limit on the response time, as long as it is finite), this meets the CAP definition of availability.
+The first problem with this proof is the definition of availability. As discussed in
+section~\ref{sec:failed-node-exception}, only non-failing nodes are required to respond, and no
+statement is made about failing nodes. In particular, there is no assumption about the number of
+nodes that may fail.
 
-If nodes are permanently partitioned, or a majority of nodes fails, ABD employs a simple solution:
-any node that cannot communicate with a majority of nodes is deemed faulty (for example, it crashes
-itself). Under the CAP definition of availability, a faulty node is not required to respond to
-requests (section~\ref{sec:failed-node-exception}). There is nothing in the definition of CAP that
-prohibits nodes from becoming crashed due to network problems.
+If it is possible for the algorithm to declare nodes as failed (e.g.\ if a node may crash itself),
+then the availability property can be trivially satisfied: all nodes can be crashed, and thus no
+node is required to respond. Of course, such an algorithm would not be useful in practice, but it
+should be considered in a formal model.
 
-Defining a minority partition as failed may feel like cheating: the intuition of CAP availability is
-that a minority partition should be able to continue processing. However, Gilbert and Lynch's
-definition of availability does not capture this intuition correctly, and it is not clear how the
-definition should be amended. (Requiring a node to always to respond, even if it has failed, would
-be nonsensical.)
+Alternatively, if a minority of nodes is permanently partitioned from the majority, an algorithm
+could define the nodes in the minority partition as failed (by crashing them), while the majority
+partition continues implementing a linearizable register~\cite{Attiya1995bm}. There is nothing in
+the definition of CAP that prohibits nodes from becoming crashed due to network problems.
+
+This is not the intention of CAP -- the raison d'\^{e}tre of CAP is to characterize systems in which
+a minority partition can continue operating independently of the rest -- but the present
+formalization of availability does not exclude such trivial solutions.
+
+\subsubsection{Structure of impossibility proof}
+
+Gilbert and Lynch's proof of theorems 1 and 2 constructs an execution of an algorithm $A$ in which a
+write is followed by a read, while simultaneously a partition exists in the network. By showing that
+the execution is not linearizable, the authors derive a contradiction. However, there is an error in
+the reasoning.
+
+At first glance, the proof appears to use a familiar technique (used e.g.\ in the proof of the FLP
+result~\cite{Fischer1985tt}):
+\begin{enumerate}
+\item A system model is defined, describing the behavior of network links (e.g.\ fair-loss or
+    reliable links, bounded or unbounded delay), the behavior of processes (e.g.\ crash-stop,
+    crash-recovery or Byzantine failures), whether clocks or failure detectors are available, etc.
+\item We assume that there exists an algorithm that ensures certain properties hold in all
+    executions of the algorithm in the given system model. We assume nothing otherwise about the
+    behavior of this algorithm (e.g.\ its communication patterns).
+\item We then construct an execution that is admissible under the assumed system model (i.e.\ which
+    is possible under the assumptions of step 1), and show that the execution inevitably leads to
+    one of the required properties being violated.
+\item This contradicts the assumption of step 2, and thus we can conclude that no algorithm exists
+    which provides the given guarantees in all executions of the given system model.
+\end{enumerate}
+
+In constructing the execution in step 3, we may freely control the input to the algorithm (the
+operations that are initiated, the time and order in which messages are delivered, and the timing
+and mode of any process failures), subject to the assumptions of the system model. However, we must
+not assume anything about the internal state, communication and output of the algorithm (the
+responses produced by the algorithm, and the messages that are sent), since to do so would undermine
+the generality of the argument. The proof must demonstrate that no matter what logic the algorithm
+internally uses, the violation of the supposed guarantees is inevitable, given the input that we
+constructed.
+
+The proof of Gilbert and Lynch's Theorem 1 does not follow this structure correctly: in the
+execution that is constructed, the presence of the partition and the initiation of the read and
+write operations are inputs to the algorithm, but the completion of the read and write operations
+are \emph{outputs} of the algorithm. We cannot in general assume anything about these outputs.
+
+In particular, we cannot assume that the completion of the write operation occurs before the
+initiation of the read operation. Indeed, if the algorithm chooses to delay the completion of the
+write operation until \emph{after} the initiation of the read operation, then the two operations are
+concurrent, and the execution is linearizable, so the proof does not hold.
 
 \subsubsection{Finite and infinite partitions}
 
-Even if we did redefine availability such that the ABD algorithm is ``unavailable,'' and thus not an
-acceptable counterexample, the proof of Theorem 1 would still be problematic.
+Is it possible to force the algorithm into an execution where the linearizability violation
+inevitably occurs? This depends on whether partitions are of finite or infinite duration. If we
+assume a system model of fair-loss links, then only partitions of finite duration are possible (see
+section~\ref{sec:fairloss}).
 
-The proof rests on constructing an execution of an algorithm $A$ in which a write is followed by a
-read, while simultaneously a partition exists in the network. However, the algorithm $A$ may never
-exhibit such an execution: for example, the algorithm could simply wait until the partition is
-healed before allowing the write operation to complete. With any partition of finite duration, $A$
-would still satisfy the availability property, because the operations would eventually complete. In
-the asynchronous model, which does not make timing assumptions, such waiting is in fact expected.
-The proof is therefore false with regard to partitions of finite duration.
+Recall that the availability property, as defined by Gilbert and Lynch, does not place any upper
+bound on the duration of an operation, as long as it is finite (section~\ref{sec:no-max-latency}).
+For this reason, if a linearizable algorithm encounters a network partition of finite duration, it
+is acceptable for the algorithm to simply wait for the partition to be healed: at any point in time,
+there is still hope that the partition will be healed in future, and so the availability property
+may yet be satisfied. For example, the ABD algorithm~\cite{Attiya1995bm} can be used to implement a
+linearizable read-write register in an asynchronous network with fair-loss
+links.\footnote{ABD~\cite{Attiya1995bm} is an algorithm for a single-writer multi-reader register.
+It was extended to the multi-writer case by Lynch and Shvartsman~\cite{Lynch1997gr}.}
 
-Only if the partition is of infinite duration, $A$ is forced to make a choice\footnote{How the
-algorithm would make that choice in the absence of clocks -- since this is an asynchronous system
-model -- is unclear. This argument applies better to Theorem 2, which uses a partially synchronous
-model (section~\ref{sec:theorem2}).} between waiting until the partition heals (which never happens,
-thus violating availability) and exhibiting the execution in the proof of Theorem 1 (thus violating
-linearizability). We can conclude that the proof of Theorem 1 is only valid in the case of an
-infinite partition.
-
-Infinite partitions cannot occur in a system with fair-loss links, and are usually considered to be
-a Byzantine fault (see section~\ref{sec:fairloss}). As discussions of CAP are usually in the context
-of non-Byzantine system models, we might conclude that Theorem 1 is false in the context in which it
-is normally applied.
+However, what if we change the system model such that partitions of infinite duration are possible?
+In the case of an infinite partition, the algorithm is forced to make a choice between waiting until
+the partition heals (which never happens, thus violating availability) and exhibiting the execution
+in the proof of Theorem 1 (thus violating linearizability). We can conclude that Theorem 1 is only
+valid in a system model where infinite partitions are possible.
 
 \subsubsection{Linearizability vs. eventual consistency}
 
 Note that in the case of an infinite partition, no information can ever flow from one sub-network to
 the other. Thus, even eventual consistency (replica convergence in finite time, see
-section~\ref{sec:c-in-cap}) is not possible in a system with an infinite partition, if availability
-is also required.
+section~\ref{sec:c-in-cap}) is not possible in a system with an infinite partition.
+
+Theorem 1 demonstrated that in a system model with infinite partitions, no algorithm exists which
+ensures linearizability and availability in all executions. However, we can also see that in the
+same system model, no algorithm exists which ensures eventual consistency in all executions.
 
 The CAP theorem is often understood as demonstrating that linearizability cannot be achieved with
-high availability, whereas eventual consistency can. In this section we showed that in the only
-situation where the proof of Theorem 1 applies (an infinite partition), linearizable and eventually
-consistent algorithms \emph{both} violate the availability requirement.
+high availability, whereas eventual consistency can. However, the results so far do not
+differentiate between linearizable and eventually consistent algorithms: both are possible if
+partitions are always finite, and both are impossible in a system model with infinite partitions.
 
-Thus, Theorem 1 does not serve to differentiate between the availability of linearizable and
-eventually consistent systems. The common interpretation, namely that Theorem 1 proves the existence
-of a trade-off between availability and consistency, is false.
+To distinguish between linearizability and eventual consistency, a more careful formalization of CAP
+is required, which we give in section~\ref{sec:partitionable-model}.
 
-\subsection{Corollary 1.1}\label{sec:corollary}
+\subsection{The partitionable system model}\label{sec:partitionable-model}
 
-Gilbert and Lynch's Corollary~1.1 is stated as follows:
+In this section we suggest a more precise formulation of CAP, and derive a result similar in spirit
+to Gilbert and Lynch's Theorem 1 and Corollary 1.1. This formulation will help us gain a more
+precise understanding of CAP and its consequences.
 
-\emph{It is impossible in the asynchronous network model to implement a read/write data object that
-guarantees the following properties:}
-\begin{itemize}
-\item \emph{Availability, in all fair executions,}
-\item \emph{Atomic consistency, in fair executions in which \emph{no} messages are lost.}
-\end{itemize}
+\subsubsection{Definitions}
 
-The proof of Corollary~1.1 relies on Theorem~1 in a situation where no messages are lost. However,
-we showed that the proof of Theorem~1 is only true in the case of an infinite partition, in which
-case an infinite number of messages are lost. Thus, Corollary~1.1 is false.
+Define a \emph{partitionable link} to be a point-to-point link with the following properties:
+\begin{enumerate}
+    \item \emph{No duplication:} If a process $p$ sends a message $m$ once to process $q$, then $m$
+        is delivered at most once by $q$.
+    \item \emph{No creation:} If some process $q$ delivers a message $m$ with sender $p$, then $m$
+        was previously sent to $q$ by process $p$.
+\end{enumerate}
+(A partitionable link is allowed to drop an infinite number of messages and cause unbounded message
+delay.)
 
-\subsection{Theorem 2}\label{sec:theorem2}
+Define the \emph{partitionable model} as a system model in which processes can only communicate via
+partitionable links, in which processes never crash,\footnote{The assumption that processes never
+crash is of course unrealistic, but it makes the impossibility results in
+section~\ref{sec:impossibility} stronger. It also rules out the trivial solution of
+section~\ref{sec:failed-node-trivial}.} and in which every process has access to a local clock that
+is able to generate timeouts (the clock progresses monotonically at a rate approximately equal to
+real time, but clocks of different processes are not synchronized).
 
-Gilbert and Lynch's Theorem~2 is similar to Theorem~1, except that it is stated in the partially
-synchronous network model rather than the asynchronous model.
+Define an execution $E$ as \emph{admissible} in a system model $M$ if the processes and links in $E$
+satisfy the properties defined by $M$.
 
-Theorem~2 is false for the same reasons as Theorem~1: the ABD algorithm provides a counterexample,
-and the execution described in the proof need not be exhibited by any algorithm in the case of a
-partition of finite duration. For a partition of infinite duration, the aforementioned observation
-about eventual consistency holds.
+Define an algorithm $A$ as \emph{terminating} in a system model $M$ if, for every execution $E$ of
+$A$, if $E$ is admissible in $M$, then every operation in $E$ terminates in finite
+time.\footnote{Our definition of \emph{terminating} corresponds to Gilbert and Lynch's definition of
+\emph{available}. We prefer to call it \emph{terminating} because the word \emph{available} is
+widely understood as referring to an empirical metric (see section~\ref{sec:availability}). There is
+some similarity to \emph{wait-free} data structures~\cite{Herlihy1988br}, although these usually
+assume reliable communication and unreliable processes.}
 
-Note that although systems in the partially synchronous model have the ability to generate timeouts,
-Gilbert and Lynch's definition of availability does not specify any timeout: it requires requests to
-return a response within some unbounded but finite time. This definition of availability is a pure
-liveness property, not a safety property~\cite{Alpern1985dg}.
+Define an execution $E$ as \emph{loss-free} if for every message $m$ sent from $p$ to $q$ during
+$E$, $m$ is eventually delivered to $q$. (There is no delay bound on delivery.)
 
-For this reason, if a linearizable algorithm encounters a network partition, it is acceptable for
-the algorithm to simply wait for the partition to be healed: at any point in time, there is still
-hope that the partition will be healed in future, and so the availability property may yet be
-satisfied. In order to force the non-linearizable execution given by Gilbert and Lynch, the
-definition of availability would have to be extended to include a deadline by which a response must
-be received, which fundamentally changes the problem. We discuss such a latency-sensitive definition
-of availability in section~\ref{sec:alternatives}.
+An execution $E$ is \emph{partitioned} if it is not loss-free. Note: we may assume that links
+automatically resend lost messages an unbounded number of times. Thus, an execution in which
+messages are transiently lost during some finite time period is not partitioned, because the links
+will eventually deliver all messages that were lost. An execution is only partitioned if the message
+loss persists forever.
 
+For the definition of \emph{linearizability} we refer to Herlihy and Wing~\cite{Herlihy1990jq}.
 
-% \subsection{Definition 3 and Theorem 4}\label{sec:theorem4}
-%
-% Gilbert and Lynch's Definition~3 describes a new replica consistency model called \emph{Delayed-$t$
-% consistency}, and a replication algorithm called \emph{modified centralized algorithm}. Theorem~4 is
-% stated as follows:
-%
-% \emph{The modified centralized algorithm is Delayed-$t$ consistent.}
-%
-% The Delayed-$t$ model is similar to linearizability, except that it falls back to sequential
-% consistency in the case where messages are lost. The sequential consistency property is encoded in
-% requirement 3 of Definition 3, which states ``The order in $P$ is consistent with the order of
-% \emph{read} and \emph{write} requests submitted at each node.''
+An infinite execution $E$ is \emph{eventually consistent} if for every operation
+$\mathit{write}(p, v)$ in $E$, there are only finitely many operations in $E$ such that
+$v \notin \mathit{read}(q)$. Stated informally, if the execution contains infinitely many read
+operations, then eventually all reads must reflect all values written~\cite{Attiya2015dm}.
+
+\subsubsection{Impossibility results}\label{sec:impossibility}
+
+\begin{theorem}\label{th:1}
+If an algorithm $A$ implements a terminating read-write register $R$ in the partitionable model,
+then there exists a loss-free execution of $A$ in which $R$ is not linearizable.
+\end{theorem}
+
+\begin{proof}
+Consider an execution $E_1$ in which the initial value of $R$ is $v_1$, and no messages are
+delivered (all messages are lost, which is admissible for partitionable links). In $E_1$, $p$ first
+performs an operation $\mathit{write}(p, v_2)$ where $v_2 \neq v_1$. This operation must terminate
+in finite time due to the termination property of $A$.
+
+After the write operation terminates, $q$ performs an operation $\mathit{read}(q)$, which must
+return $v_1$, since there is no way for $q$ to know the value $v_2$, due to all messages being lost.
+The read must also terminate. This execution is not linearizable, because the read did not return
+$v_2$.
+
+Now consider an execution $E_2$ which extends $E_1$ as follows: after the termination of the
+$\mathit{read}(q)$ operation, every message that was sent during $E_1$ is delivered (this is
+admissible for partitionable links). These deliveries cannot affect the execution of the write and
+read operations, since they occur after the termination of both operations, so $E_2$ is also
+non-linearizable. Moreover, $E_2$ is loss-free, since every message was delivered.
+\end{proof}
+
+\begin{corollary}\label{corr:2}
+There is no algorithm that implements a terminating read-write register in the partitionable model
+that is linearizable in all loss-free executions.
+\end{corollary}
+
+This follows directly from the existence of a loss-free, non-linearizable execution
+(assertion~\ref{th:1}). Our corollary is a more precise formulation of Gilbert and Lynch's
+Corollary~1.1.
+
+\begin{theorem}\label{th:3}
+There is no algorithm that implements a terminating read-write register in the partitionable model
+that is eventually consistent in all executions.
+\end{theorem}
+
+\begin{proof}
+Consider an execution $E$ in which no messages are delivered, and in which process $p$ performs
+operation $\mathit{write}(p, v)$. This write must terminate, since the algorithm is terminating.
+Process $q$ with $p \neq q$ performs $\mathit{read}(q)$ infinitely many times. However, since no
+messages are delivered, $q$ can never learn about the value written, so $\mathit{read}(q)$ never
+returns $v$. Thus, $E$ is not eventually consistent.
+\end{proof}
+
+\subsubsection{Opportunistic properties}
+
+Note that corollary~\ref{corr:2} is about loss-free executions, whereas assertion~\ref{th:3} is
+about \emph{all} executions. If we limit ourselves to loss-free executions, then eventual
+consistency \emph{is} possible (e.g.\ by maintaining a replica at each process, and broadcasting
+every write to all processes).
+
+However, everything we have discussed in this section pertains to the partitionable model, in which
+we cannot assume that all executions are loss-free. For clarity, we should specify the properties of
+an algorithm such that they hold for \emph{all} admissible executions of a given system model, not
+only selected executions.
+
+To this end, we can transform a property $\mathcal{P}$ into an \emph{opportunistic} property
+$\mathcal{P}^\prime$ such that:
+$$\forall E \mathbin{:} (E \models \mathcal{P}^\prime) \Leftrightarrow (\mathit{lossfree}(E) \Rightarrow (E \models \mathcal{P}))$$
+or, equivalently:
+$$\forall E \mathbin{:} (E \models \mathcal{P}^\prime) \Leftrightarrow (\mathit{partitioned}(E) \vee (E \models \mathcal{P}))\,.$$
+In other words, $\mathcal{P}^\prime$ is trivially satisfied for executions that are partitioned.
+Requiring $\mathcal{P}^\prime$ to hold for all executions is equivalent to requiring $\mathcal{P}$
+to hold for all loss-free executions.
+
+Hence we define an execution $E$ as \emph{opportunistically eventually consistent} if $E$ is
+partitioned or if $E$ is eventually consistent. (This is a weaker liveness property than eventual
+consistency.)
+
+Similarly, we define an execution $E$ as \emph{opportunistically terminating linearizable} if $E$ is
+partitioned, or if $E$ is linearizable and every operation in $E$ terminates in finite time.
+
+From the results above, we can see that opportunistic terminating linearizability is impossible in
+the partitionable model (corollary~\ref{corr:2}), whereas opportunistic eventual consistency is
+possible. This distinction can be understood as the key result of CAP. However, it is arguably not a
+very interesting or insightful result.
 
 \section{Alternatives to CAP}\label{sec:alternatives}
 
 In section~\ref{sec:definitions} we explored the definitions of the terms \emph{consistency},
 \emph{availability} and \emph{partition tolerance}, and noted that a wide range of ambiguous and
 mutually incompatible interpretations have been proposed, leading to widespread confusion. Then,
-using Gilbert and Lynch's definition of those terms, we showed in section~\ref{sec:proofs} that the
-purported proofs of CAP are incorrect.
+in section~\ref{sec:proofs} we explored Gilbert and Lynch's definitions and proofs in more detail,
+and highlighted some problems with the formalization of CAP.
 
-This does not mean that things previously thought impossible are actually possible; these
-observations only indicate that CAP is not an appropriate tool for making statements about the
-possibility or impossibility of systems.
+All of these misunderstandings and ambiguity lead us to asserting that CAP is no longer an
+appropriate tool for reasoning about systems. A better framework for describing trade-offs is
+required. Such a framework should be simple to understand, match most people's intuitions, and use
+definitions that are formal and correct.
 
-What next? Perhaps an informally specified, rule-of-thumb \emph{CAP Principle} remains a useful tool
-for system design, though such a principle would need to clarify which of the many definitions of
-section~\ref{sec:definitions} it uses. However, a rule of thumb should not be mistaken for a
-theorem, unless formally proved. Perhaps a correct theorem can be salvaged by adopting a better
-formalism, but we do not attempt to prove this.
-
-Instead, in this section we develop an alternative framework for reasoning about trade-offs between
-consistency and robustness to network faults, called \emph{delay-sensitivity}. It is based on to
-several existing results from the distributed systems literature (most of which in fact predate CAP,
-but do not seem to be widely known among proponents of CAP). The delay-sensitivity framework is
-introduced in sections~\ref{sec:latency-availability} to \ref{sec:terminology}.
+In the rest of this paper we develop a first draft of an alternative framework called
+\emph{delay-sensitivity}, which provides tools for reasoning about trade-offs between consistency
+and robustness to network faults. It is based on to several existing results from the distributed
+systems literature (most of which in fact predate CAP).
 
 \subsection{Latency and availability}\label{sec:latency-availability}
 
-As discussed in section~\ref{sec:availability}, the latency (response time) of operations is often
-important in practice. In most situations, a service that takes a week to respond might as well be
-unavailable. A simple timeout is the most common type of failure detector. By contrast, Gilbert and
-Lynch's definition of availability explicitly ignores latency.
+As discussed in section~\ref{sec:no-max-latency}, the latency (response time) of operations is often
+important in practice, but it is deliberately ignored by Gilbert and Lynch.
 
 The problem with latency is that it is more difficult to model. Latency is influenced by many
 factors, especially the delay of packets on the network. Many computer networks (including Ethernet
@@ -494,11 +629,13 @@ retransmitted an unbounded number of times.
 
 Abadi~\cite{Abadi2012hb} argues that there is a trade-off between consistency and latency, which
 applies even when there is no network partition, and which is as important as the
-consistency/availability trade-off described by CAP. We go further, and assert that availability
-should be modeled in terms of operation latency. For example, we could define the availability of a
-service as the proportion of requests that meet some latency bound (e.g.\ returning successfully
-within 500~ms, as defined by a SLA). This empirically-founded definition of availability closely
-matches our intuitive understanding.
+consistency/availability trade-off described by CAP. He proposes a ``PACELC'' formulation to reason
+about this trade-off.
+
+We go further, and assert that availability should be modeled in terms of operation latency. For
+example, we could define the availability of a service as the proportion of requests that meet some
+latency bound (e.g.\ returning successfully within 500~ms, as defined by a SLA). This
+empirically-founded definition of availability closely matches our intuitive understanding.
 
 We can then reason about a service's tolerance of network problems by analyzing how operation
 latency is affected by changes in network delay, and whether this pushes operation latency over the
@@ -623,10 +760,10 @@ and the leader (possibly via other nodes). In a geographically distributed syste
 leader are in different locations, $d$ includes WAN links. If the client is temporarily partitioned
 from the leader, $d$ increases up to the duration of the partition.
 
-By contrast, the ABD algorithm (section~\ref{sec:abd-algorithm}) waits for responses from a majority
-of replicas, so $d$ is the largest among the majority of replicas that are fastest to respond. If a
-minority of replicas is temporarily partitioned from the client, the operation latency remains
-independent of the partition duration.
+By contrast, the ABD algorithm~\cite{Attiya1995bm} waits for responses from a majority of replicas,
+so $d$ is the largest among the majority of replicas that are fastest to respond. If a minority of
+replicas is temporarily partitioned from the client, the operation latency remains independent of
+the partition duration.
 
 Another possibility is to treat network delay within the same datacenter, $d_\textit{local}$,
 differently from network delay over WAN links, $d_\textit{remote}$, because usually
@@ -716,11 +853,10 @@ as a starting point for further discussion.
 
 \section{Conclusion}
 
-In this paper we showed that the CAP theorem is false (so it is not a theorem). Although an
-informally-defined CAP principle may still be useful for designing practical systems, we have
-pointed out that the definitions of consistency, availability and partition tolerance in the
-literature are somewhat contradictory and counter-intuitive, and thus it is unclear whether any
-precise meaning could be ascribed to such a principle.
+In this paper we discussed a variety of problems with the CAP theorem: the definitions of
+consistency, availability and partition tolerance in the literature are somewhat contradictory and
+counter-intuitive; there are formal problems in the proofs; and the distinction that CAP draws
+between ``strong'' and ``eventual'' consistency models is less clear than widely believed.
 
 CAP has nevertheless been very influential in the design of distributed data systems. It deserves
 credit for catalyzing the exploration of the design space of systems with weak consistency
@@ -739,7 +875,7 @@ can still meet its service level agreement (SLA) when a network fault occurs.
 The actual sensitivity of a system to network delay depends on its implementation, but -- in keeping
 with the goal of CAP -- we can prove that certain levels of consistency cannot be achieved without
 making operation latency proportional to network delay. These theoretical lower bounds are
-summarized in table~\ref{tab:op-latency}. We have not proved any new results in this paper, but
+summarized in Table~\ref{tab:op-latency}. We have not proved any new results in this paper, but
 merely drawn on existing distributed systems research dating mostly from the 1990s (and thus
 predating CAP).
 
@@ -751,7 +887,7 @@ appropriate for their use cases.
 
 \subsection*{Acknowledgements}
 
-Many thanks to Niklas Ekström for fruitful discussions around this topic.
+Many thanks to Niklas Ekström, Seth Gilbert and Henry Robinson for fruitful discussions around this topic.
 
 {\footnotesize
 \bibliographystyle{plainnat}
