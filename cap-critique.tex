@@ -589,6 +589,26 @@ the partitionable model (corollary~\ref{corr:2}), whereas opportunistic eventual
 possible. This distinction can be understood as the key result of CAP. However, it is arguably not a
 very interesting or insightful result.
 
+\subsection{The problem with liveness}\label{sec:liveness}
+
+Many of the problems in this section are due to the fact that availability is defined by Gilbert and
+Lynch as a liveness property (section~\ref{sec:no-max-latency}). Liveness properties make statements
+about something happening \emph{eventually} in an infinite execution, which is confusing to
+practitioners, since real systems need to get things done in a finite (and usually short) amount of
+time.
+
+Quoting Lamport~\cite{Lamport2000bi}: ``Liveness properties are inherently problematic. The question
+of whether a real system satisfies a liveness property is meaningless; it can be answered only by
+observing the system for an infinite length of time, and real systems don't run forever. Liveness is
+always an approximation to the property we really care about. We want a program to terminate within
+100 years, but proving that it does would require the addition of distracting timing assumptions.
+So, we prove the weaker condition that the program eventually terminates. This doesn't prove that
+the program will terminate within our lifetimes, but it does demonstrate the absence of infinite
+loops.''
+
+In section~\ref{sec:alternatives} we explore an alternative formulation of the trade-off between
+consistency and availability, focussing on \emph{latency}.
+
 \section{Alternatives to CAP}\label{sec:alternatives}
 
 In section~\ref{sec:definitions} we explored the definitions of the terms \emph{consistency},
