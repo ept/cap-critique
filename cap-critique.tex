@@ -109,7 +109,7 @@ Some authors~\cite{Darcy2010ta, Liochon2015vt} define a CP system as one in whic
 nodes on one side of a partition can continue operating normally, and a CA system as one that may
 fail catastrophically under a network partition (since it is designed on the assumption that
 partitions are very rare). However, this definition is not universally agreed, since it is
-counterintuitive to label a system as ``available'' if it fails catastrophically under a partition,
+counter-intuitive to label a system as ``available'' if it fails catastrophically under a partition,
 while a system that continues partially operating in the same situation is labelled ``unavailable''
 (see section~\ref{sec:partitions}).
 
@@ -195,7 +195,7 @@ Another noteworthy aspect of Gilbert and Lynch's definition of availability is t
 applying only to \emph{non-failed} nodes. This allows the aforementioned definition of a CA system
 as one that fails catastrophically if a network partition occurs: if the partition causes all nodes
 to fail, then the availability requirement does not apply to any nodes, and thus it is trivially
-satisified, even if no node is able to respond to any requests. This definition is logically sound,
+satisfied, even if no node is able to respond to any requests. This definition is logically sound,
 but somewhat counter-intuitive.
 
 \subsection{Consistency}\label{sec:consistency}
@@ -253,7 +253,7 @@ It is also possible to define consistency as a quantitative metric rather than a
 For example, Fox and Brewer~\cite{Fox1999bs} define \emph{harvest} as ``the fraction of the data
 reflected in the response, i.e.\ the completeness of the answer to the query,'' and
 probabilistically bounded staleness~\cite{Bailis2012to} studies the probability of a read returning
-a stale value, given various assuptions about the distribution of network latencies. However, these
+a stale value, given various assumptions about the distribution of network latencies. However, these
 stochastic definitions of consistency are not the subject of CAP.
 
 \subsection{Partition Tolerance}\label{sec:partitions}
