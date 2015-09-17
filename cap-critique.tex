@@ -589,7 +589,7 @@ the partitionable model (corollary~\ref{corr:2}), whereas opportunistic eventual
 possible. This distinction can be understood as the key result of CAP. However, it is arguably not a
 very interesting or insightful result.
 
-\subsection{The problem with liveness}\label{sec:liveness}
+\subsection{Mismatch between formal model and practical systems}
 
 Many of the problems in this section are due to the fact that availability is defined by Gilbert and
 Lynch as a liveness property (section~\ref{sec:no-max-latency}). Liveness properties make statements
@@ -606,8 +606,18 @@ So, we prove the weaker condition that the program eventually terminates. This d
 the program will terminate within our lifetimes, but it does demonstrate the absence of infinite
 loops.''
 
-In section~\ref{sec:alternatives} we explore an alternative formulation of the trade-off between
-consistency and availability, focussing on \emph{latency}.
+Brewer~\cite{Brewer2012ba} and some commercial database vendors~\cite{Aerospike2014wa} state that
+``all three properties [consistency, availability, and partition tolerance] are more continuous than
+binary''. This is in direct contradiction to Gilbert and Lynch's formalization of CAP (and our
+restatement thereof), which expresses consistency and availability as safety and liveness properties
+of an algorithm, and partitions as a property of the system model. Such properties either hold or
+they do not hold; there is no degree of continuity in their definition.
+
+Brewer's informal interpretation of CAP is intuitively appealing, but it is not a theorem, since it
+is not expressed formally (and thus cannot be proved or disproved) -- it is, at best, a rule of
+thumb. Gilbert and Lynch's formalization can be proved correct, but it does not correspond to
+practitioners' intuitions for real systems. This contradiction suggests that although the formal
+model may be true, it is not useful.
 
 \section{Alternatives to CAP}\label{sec:alternatives}
 
@@ -654,7 +664,7 @@ about this trade-off.
 
 We go further, and assert that availability should be modeled in terms of operation latency. For
 example, we could define the availability of a service as the proportion of requests that meet some
-latency bound (e.g.\ returning successfully within 500~ms, as defined by a SLA). This
+latency bound (e.g.\ returning successfully within 500~ms, as defined by an SLA). This
 empirically-founded definition of availability closely matches our intuitive understanding.
 
 We can then reason about a service's tolerance of network problems by analyzing how operation
@@ -898,6 +908,10 @@ making operation latency proportional to network delay. These theoretical lower 
 summarized in Table~\ref{tab:op-latency}. We have not proved any new results in this paper, but
 merely drawn on existing distributed systems research dating mostly from the 1990s (and thus
 predating CAP).
+
+For future work, it would be interesting to model the \emph{distribution} of latencies for different
+concurrency control and replication algorithms (e.g.\ by extending PBS~\cite{Bailis2012to}), rather
+than modeling network delay as just a single number $d$.
 
 We hope that by being more rigorous about the implications of different consistency levels on
 performance and fault tolerance, we can encourage designers of distributed data systems to continue
