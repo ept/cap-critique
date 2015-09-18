@@ -25,13 +25,13 @@
 The \emph{CAP Theorem} is a frequently cited impossibility result in distributed systems, especially
 among \emph{NoSQL} distributed databases. In this paper we survey some of the confusion about the
 meaning of CAP, including inconsistencies and ambiguities in its definitions, and we highlight some
-problems in its formalization and proofs. CAP is often interpreted as proof that eventually
-consistent databases have better availability properties than strongly consistent databases;
-although there is some truth in this, we show that more careful reasoning is required. These
-problems cast doubt on the utility of CAP as a tool for reasoning about trade-offs in practical
-systems. As alternative to CAP, we propose a \emph{delay-sensitivity} framework, which analyzes the
-sensitivity of operation latency to network delay, and which may help practitioners reason about the
-trade-offs between consistency guarantees and tolerance of network faults.
+problems in its formalization. CAP is often interpreted as proof that eventually consistent
+databases have better availability properties than strongly consistent databases; although there is
+some truth in this, we show that more careful reasoning is required. These problems cast doubt on
+the utility of CAP as a tool for reasoning about trade-offs in practical systems. As alternative to
+CAP, we propose a \emph{delay-sensitivity} framework, which analyzes the sensitivity of operation
+latency to network delay, and which may help practitioners reason about the trade-offs between
+consistency guarantees and tolerance of network faults.
 
 
 \section{Background}
@@ -68,15 +68,16 @@ sensitive to message delays and faults in the network. Many real computer networ
 unbounded delays and lost messages~\cite{Bailis2014jx}, making the fault tolerance of distributed
 consistency algorithms an important issue in practice.
 
-A particular kind of fault that has been studied since the 1970s is the \emph{network partition}, a
-communication fault that splits the network into subsets of nodes such that nodes in one subset
-cannot communicate with nodes in another~\cite{Johnson1975we, Lindsay1979wv, Fischer1982hc, Davidson1985hv}.
-As long as the partition exists, any data modifications made in one subset of nodes cannot be
-visible to nodes in another subset, since all messages between them are lost. Thus, an algorithm
-that maintains the illusion of a single copy may have to delay operations until the partition is
-healed, to avoid the risk of introducing inconsistent data in different subsets of nodes.
+A \emph{network partition} is a particular kind of communication fault that splits the network into
+subsets of nodes such that nodes in one subset cannot communicate with nodes in another. As long as
+the partition exists, any data modifications made in one subset of nodes cannot be visible to nodes
+in another subset, since all messages between them are lost. Thus, an algorithm that maintains the
+illusion of a single copy may have to delay operations until the partition is healed, to avoid the
+risk of introducing inconsistent data in different subsets of nodes.
 
-This trade-off was already known in 1975~\cite{Johnson1975we}, but it was rediscovered in the early
+This trade-off was already known in the
+1970s~\cite{Johnson1975we, Lindsay1979wv, Fischer1982hc, Davidson1985hv},
+but it was rediscovered in the early
 2000s, when the web's growing commercial popularity made geographic distribution and high
 availability important to many organizations~\cite{Brewer2012tr, Vogels2008ey}. It was originally
 called the \emph{CAP Principle} by Fox and Brewer~\cite{Fox1999bs, Brewer2000vd}, where CAP stands
@@ -91,9 +92,9 @@ received wisdom that strong consistency guarantees were essential for databases~
 
 The rest of this paper is organized as follows: in section~\ref{sec:definitions} we compare various
 definitions of consistency, availability and partition tolerance. We then examine the formalization
-of CAP by Gilbert and Lynch~\cite{Gilbert2002il} in section~\ref{sec:proofs}, and highlight problems
-in the proofs. Finally, in section~\ref{sec:alternatives} we discuss some alternatives to CAP that
-are useful for reasoning about trade-offs in distributed systems.
+of CAP by Gilbert and Lynch~\cite{Gilbert2002il} in section~\ref{sec:proofs}. Finally, in
+section~\ref{sec:alternatives} we discuss some alternatives to CAP that are useful for reasoning
+about trade-offs in distributed systems.
 
 \section{CAP Theorem Definitions}\label{sec:definitions}
 
@@ -154,23 +155,23 @@ as an observed metric during system operation -- i.e.\ they define a system as b
 or ``unavailable'' statically, based on its algorithms, not its operational status at some point in
 time.
 
+One particular execution of the algorithm is available if every request in that execution eventually
+receives a response. Thus, an algorithm is ``available'' under Gilbert and Lynch's definition if
+\emph{all} possible executions of the algorithm are available. That is, the algorithm must guarantee
+that requests always result in responses, no matter what happens in the system (see
+section~\ref{sec:systemmodel}).
+
 Note that Gilbert and Lynch's definition requires \emph{any} non-failed node to be able to generate
 valid responses, even if that node is completely isolated from the other nodes. This definition is
 at odds with Fox and Brewer's original proposal of CAP, which states that ``data is considered
 highly available if a given consumer of the data can always reach \emph{some}
 replica''~\cite[emphasis original]{Fox1999bs}.
 
-Gilbert and Lynch's requirement appears to be stronger, since Fox and Brewer's definition allows a
-node to refuse requests as long as another node can generate valid responses, and that node is
-reachable by the consumer.
-
 Many so-called highly available or fault-tolerant systems have very high uptime in practice, but are
 in fact ``unavailable'' under Gilbert and Lynch's definition~\cite{Kim1984bl}: for example, in a
 system with an elected leader or primary node, if a client that cannot reach the leader due to a
 network fault, the client cannot perform any writes, even though it may be able to reach another
-replica. Conversely, a system that is ``available'' under Gilbert and Lynch's definition may
-nevertheless experience downtime (e.g.\ if the client is isolated from all of the replicas), so
-CAP-availability is no guarantee of service availability.
+replica.
 
 \subsubsection{No maximum latency}\label{sec:no-max-latency}
 
@@ -263,7 +264,7 @@ split into disjoint sub-networks, with no communication possible across
 sub-networks~\cite{Johnson1975we}. This is a fairly narrow class of fault, but it does occur in
 practice~\cite{Bailis2014jx}, so it is worth studying.
 
-\subsubsection{Assumptions about system model}
+\subsubsection{Assumptions about system model}\label{sec:systemmodel}
 
 It is less clear what \emph{partition tolerance} means. Gilbert and Lynch~\cite{Gilbert2002il}
 define a system as partition-tolerant if it continues to satisfy the consistency and availability
@@ -313,12 +314,12 @@ duration. On a fair-loss link, message delivery can be made reliable by retrying
 unbounded number of times: the message is guaranteed to be eventually delivered after a finite
 number of attempts~\cite{Cachin2011wt}.
 
-We argue that fair-loss links are a good model of most networks in practice: faults occur randomly
-(not due to malicious activity); messages are lost while the fault is occurring; the fault lasts for
-some finite duration (perhaps seconds, perhaps hours), and eventually it is healed (perhaps after
-human intervention). There is no malicious actor in the network who can cause systematic message
-loss over unlimited periods of time -- such malicious actors are usually only assumed in the design
-of Byzantine fault tolerant algorithms.
+We argue that fair-loss links are a good model of most networks in practice: faults occur
+unpredictably; messages are lost while the fault is occurring; the fault lasts for some finite
+duration (perhaps seconds, perhaps hours), and eventually it is healed (perhaps after human
+intervention). There is no malicious actor in the network who can cause systematic message loss over
+unlimited periods of time -- such malicious actors are usually only assumed in the design of
+Byzantine fault tolerant algorithms.
 
 Is ``partitions may occur'' equivalent to assuming fair-loss links? Gilbert and
 Lynch~\cite{Gilbert2002il} define partitions as ``the network will be allowed to lose arbitrarily
@@ -333,8 +334,8 @@ section~\ref{sec:proofs}.
 \section{The CAP Proofs}\label{sec:proofs}
 
 In this section, we build upon the discussion of definitions in the last section, and examine the
-proofs of the theorems of Gilbert and Lynch~\cite{Gilbert2002il}. We highlight some problems in the
-reasoning of the proofs, and then suggest a more precise formalization.
+proofs of the theorems of Gilbert and Lynch~\cite{Gilbert2002il}. We highlight some ambiguities in
+the reasoning of the proofs, and then suggest a more precise formalization.
 
 \subsection{Theorems 1 and 2}\label{sec:theorem1}
 
@@ -355,88 +356,45 @@ this section~\ref{sec:theorem1} applies to both theorems.
 \subsubsection{Availability of failed nodes}\label{sec:failed-node-trivial}
 
 The first problem with this proof is the definition of availability. As discussed in
-section~\ref{sec:failed-node-exception}, only non-failing nodes are required to respond, and no
-statement is made about failing nodes. In particular, there is no assumption about the number of
-nodes that may fail.
+section~\ref{sec:failed-node-exception}, only non-failing nodes are required to respond.
 
 If it is possible for the algorithm to declare nodes as failed (e.g.\ if a node may crash itself),
 then the availability property can be trivially satisfied: all nodes can be crashed, and thus no
-node is required to respond. Of course, such an algorithm would not be useful in practice, but it
-should be considered in a formal model.
-
+node is required to respond. Of course, such an algorithm would not be useful in practice.
 Alternatively, if a minority of nodes is permanently partitioned from the majority, an algorithm
 could define the nodes in the minority partition as failed (by crashing them), while the majority
-partition continues implementing a linearizable register~\cite{Attiya1995bm}. There is nothing in
-the definition of CAP that prohibits nodes from becoming crashed due to network problems.
+partition continues implementing a linearizable register~\cite{Attiya1995bm}.
 
 This is not the intention of CAP -- the raison d'\^{e}tre of CAP is to characterize systems in which
 a minority partition can continue operating independently of the rest -- but the present
 formalization of availability does not exclude such trivial solutions.
 
-\subsubsection{Structure of impossibility proof}
-
-Gilbert and Lynch's proof of theorems 1 and 2 constructs an execution of an algorithm $A$ in which a
-write is followed by a read, while simultaneously a partition exists in the network. By showing that
-the execution is not linearizable, the authors derive a contradiction. However, there is an error in
-the reasoning.
-
-At first glance, the proof appears to use a familiar technique (used e.g.\ in the proof of the FLP
-result~\cite{Fischer1985tt}):
-\begin{enumerate}
-\item A system model is defined, describing the behavior of network links (e.g.\ fair-loss or
-    reliable links, bounded or unbounded delay), the behavior of processes (e.g.\ crash-stop,
-    crash-recovery or Byzantine failures), whether clocks or failure detectors are available, etc.
-\item We assume that there exists an algorithm that ensures certain properties hold in all
-    executions of the algorithm in the given system model. We assume nothing otherwise about the
-    behavior of this algorithm (e.g.\ its communication patterns).
-\item We then construct an execution that is admissible under the assumed system model (i.e.\ which
-    is possible under the assumptions of step 1), and show that the execution inevitably leads to
-    one of the required properties being violated.
-\item This contradicts the assumption of step 2, and thus we can conclude that no algorithm exists
-    which provides the given guarantees in all executions of the given system model.
-\end{enumerate}
-
-In constructing the execution in step 3, we may freely control the input to the algorithm (the
-operations that are initiated, the time and order in which messages are delivered, and the timing
-and mode of any process failures), subject to the assumptions of the system model. However, we must
-not assume anything about the internal state, communication and output of the algorithm (the
-responses produced by the algorithm, and the messages that are sent), since to do so would undermine
-the generality of the argument. The proof must demonstrate that no matter what logic the algorithm
-internally uses, the violation of the supposed guarantees is inevitable, given the input that we
-constructed.
-
-The proof of Gilbert and Lynch's Theorem 1 does not follow this structure correctly: in the
-execution that is constructed, the presence of the partition and the initiation of the read and
-write operations are inputs to the algorithm, but the completion of the read and write operations
-are \emph{outputs} of the algorithm. We cannot in general assume anything about these outputs.
-
-In particular, we cannot assume that the completion of the write operation occurs before the
-initiation of the read operation. Indeed, if the algorithm chooses to delay the completion of the
-write operation until \emph{after} the initiation of the read operation, then the two operations are
-concurrent, and the execution is linearizable, so the proof does not hold.
-
 \subsubsection{Finite and infinite partitions}
 
-Is it possible to force the algorithm into an execution where the linearizability violation
-inevitably occurs? This depends on whether partitions are of finite or infinite duration. If we
-assume a system model of fair-loss links, then only partitions of finite duration are possible (see
-section~\ref{sec:fairloss}).
+Gilbert and Lynch's proofs of theorems 1 and 2 construct an execution of an algorithm $A$ in which a
+write is followed by a read, while simultaneously a partition exists in the network. By showing that
+the execution is not linearizable, the authors derive a contradiction.
 
-Recall that the availability property, as defined by Gilbert and Lynch, does not place any upper
-bound on the duration of an operation, as long as it is finite (section~\ref{sec:no-max-latency}).
-For this reason, if a linearizable algorithm encounters a network partition of finite duration, it
-is acceptable for the algorithm to simply wait for the partition to be healed: at any point in time,
-there is still hope that the partition will be healed in future, and so the availability property
-may yet be satisfied. For example, the ABD algorithm~\cite{Attiya1995bm} can be used to implement a
-linearizable read-write register in an asynchronous network with fair-loss
-links.\footnote{ABD~\cite{Attiya1995bm} is an algorithm for a single-writer multi-reader register.
-It was extended to the multi-writer case by Lynch and Shvartsman~\cite{Lynch1997gr}.}
+Note that this reasoning is only correct if we assume a system model in which partitions may have
+infinite duration.
 
-However, what if we change the system model such that partitions of infinite duration are possible?
-In the case of an infinite partition, the algorithm is forced to make a choice between waiting until
-the partition heals (which never happens, thus violating availability) and exhibiting the execution
-in the proof of Theorem 1 (thus violating linearizability). We can conclude that Theorem 1 is only
-valid in a system model where infinite partitions are possible.
+If the system model is based on fair-loss links, then all partitions may be assumed to be of
+unbounded but finite duration (section~\ref{sec:fairloss}). Likewise, Gilbert and Lynch's
+availability property does not place any upper bound on the duration of an operation, as long as it
+is finite (section~\ref{sec:no-max-latency}). Thus, if a linearizable algorithm encounters a
+network partition in a fair-loss system model, it is acceptable for the algorithm to simply wait for
+the partition to be healed: at any point in time, there is still hope that the partition will be
+healed in future, and so the availability property may yet be satisfied. For example, the ABD
+algorithm~\cite{Attiya1995bm} can be used to implement a linearizable read-write register in an
+asynchronous network with fair-loss links.\footnote{ABD~\cite{Attiya1995bm} is an algorithm for a
+single-writer multi-reader register. It was extended to the multi-writer case by Lynch and
+Shvartsman~\cite{Lynch1997gr}.}
+
+On the other hand, in an execution where a partition of infinite duration occurs, the algorithm is
+forced to make a choice between waiting until the partition heals (which never happens, thus
+violating availability) and exhibiting the execution in the proof of Theorem 1 (thus violating
+linearizability). We can conclude that Theorem 1 is only valid in a system model where infinite
+partitions are possible.
 
 \subsubsection{Linearizability vs. eventual consistency}
 
@@ -458,9 +416,9 @@ is required, which we give in section~\ref{sec:partitionable-model}.
 
 \subsection{The partitionable system model}\label{sec:partitionable-model}
 
-In this section we suggest a more precise formulation of CAP, and derive a result similar in spirit
-to Gilbert and Lynch's Theorem 1 and Corollary 1.1. This formulation will help us gain a more
-precise understanding of CAP and its consequences.
+In this section we suggest a more precise formulation of CAP, and derive a result similar to Gilbert
+and Lynch's Theorem 1 and Corollary 1.1. This formulation will help us gain a better understanding
+of CAP and its consequences.
 
 \subsubsection{Definitions}
 
@@ -504,10 +462,16 @@ loss persists forever.
 
 For the definition of \emph{linearizability} we refer to Herlihy and Wing~\cite{Herlihy1990jq}.
 
-An infinite execution $E$ is \emph{eventually consistent} if for every operation
-$\mathit{write}(p, v)$ in $E$, there are only finitely many operations in $E$ such that
-$v \notin \mathit{read}(q)$. Stated informally, if the execution contains infinitely many read
-operations, then eventually all reads must reflect all values written~\cite{Attiya2015dm}.
+There is no generally agreed formalization of \emph{eventual consistency}, but the following
+corresponds to a liveness property that has been proposed~\cite{Bailis2013jc, Attiya2015dm}:
+eventually, every read operation $\mathit{read}(q)$ at process $q$ must return a set of all the
+values $v$ ever written by any process $p$ in an operation $\mathit{write}(p, v)$. For simplicity,
+we assume that values are never removed from the read set, although an application may only see one
+of the values (e.g.\ the one with the highest timestamp).
+
+More formally, an infinite execution $E$ is \emph{eventually consistent} if, for all processes $p$
+and $q$, and for every value $v$ such that operation $\mathit{write}(p, v)$ occurs in $E$, there are
+only finitely many operations in $E$ such that $v \notin \mathit{read}(q)$.
 
 \subsubsection{Impossibility results}\label{sec:impossibility}
 
@@ -539,9 +503,8 @@ There is no algorithm that implements a terminating read-write register in the p
 that is linearizable in all loss-free executions.
 \end{corollary}
 
-This follows directly from the existence of a loss-free, non-linearizable execution
-(assertion~\ref{th:1}). Our corollary is a more precise formulation of Gilbert and Lynch's
-Corollary~1.1.
+This corresponds to Gilbert and Lynch's Corollary~1, and follows directly from the existence of a
+loss-free, non-linearizable execution (assertion~\ref{th:1}).
 
 \begin{theorem}\label{th:3}
 There is no algorithm that implements a terminating read-write register in the partitionable model
@@ -670,8 +633,8 @@ empirically-founded definition of availability closely matches our intuitive und
 We can then reason about a service's tolerance of network problems by analyzing how operation
 latency is affected by changes in network delay, and whether this pushes operation latency over the
 limit set by the SLA. If a service can sustain low operation latency, even as network delay
-increases dramatically, it is more tolerant of network problems than a service whose operation
-latency increases.
+increases dramatically, it is more tolerant of network problems than a service whose latency
+increases.
 
 \subsection{How operation latency depends on network delay}\label{sec:network-dependence}
 
@@ -686,9 +649,13 @@ of the network delay $d$. These results show that any algorithm guaranteeing a p
 consistency cannot perform operations faster than some lower bound. We summarize these results in
 table~\ref{tab:op-latency} and in the following sections.
 
-These analyses are similar to results in complexity theory, which describe the running time of an
-algorithm as a function of the size of its input. Here, we describe the latency of an operation as a
-function of the network delay.
+Our notation is similar to that used in complexity theory to describe the running time of an
+algorithm. However, rather than being a function of the size of input, we describe the latency of an
+operation as a function of network delay.
+
+In this section we assume unbounded network delay, and unsynchronized clocks (i.e.\ each process has
+access to a clock that progresses monotonically at a rate approximately equal to real time, but the
+synchronization error between clocks is unbounded).
 
 \begin{table}
     \centering
@@ -852,10 +819,10 @@ as a starting point for further discussion.
     is \emph{delay-independent}. Systems must specify the nature of the sensitivity (e.g.\ an
     operation may be sensitive to intra-datacenter delay but independent of inter-datacenter delay).
     A fully delay-independent system supports \emph{disconnected (offline) operation}.
-\item[Network faults] is a catch-all for packet loss (both transient and long-lasting) and unusually
-    large packet delay. \emph{Network partitions} are just one particular type of network fault; in
-    most cases, systems should plan for all kinds of network fault, and not only partitions. As
-    long as lost packets or failed requests are retried, they can be modeled as large network delay.
+\item[Network faults] encompass packet loss (both transient and long-lasting) and unusually large
+    packet delay. \emph{Network partitions} are just one particular type of network fault; in most
+    cases, systems should plan for all kinds of network fault, and not only partitions. As long as
+    lost packets or failed requests are retried, they can be modeled as large network delay.
 \item[Fault tolerance] is used in preference to \emph{high availability} or \emph{partition
     tolerance}. The maximum fault that can be tolerated must be specified (e.g.\ ``the algorithm can
     tolerate up to a minority of replicas crashing or disconnecting''), and the description must
@@ -868,10 +835,6 @@ as a starting point for further discussion.
     consistency or one-copy serializability.
 \end{description}
 
-% An option for disconnected linearizability is to make a single replica the owner of an object.
-% This makes access slower for all other replicas, but allows constant-time access by the owner.
-% (Mavronicolas and Roth, 1992)
-
 % Brewer states that ``there is little reason to forfeit C or A when the system is not
 % partitioned''~\cite{Brewer2012ba}, yet many distributed datastores (e.g.\ Dynamo, Riak, Cassandra
 % and Voldemort) don't provide linearizabile consistency, even in the absence of
@@ -883,10 +846,10 @@ as a starting point for further discussion.
 
 \section{Conclusion}
 
-In this paper we discussed a variety of problems with the CAP theorem: the definitions of
-consistency, availability and partition tolerance in the literature are somewhat contradictory and
-counter-intuitive; there are formal problems in the proofs; and the distinction that CAP draws
-between ``strong'' and ``eventual'' consistency models is less clear than widely believed.
+In this paper we discussed several problems with the CAP theorem: the definitions of consistency,
+availability and partition tolerance in the literature are somewhat contradictory and
+counter-intuitive, and the distinction that CAP draws between ``strong'' and ``eventual''
+consistency models is less clear than widely believed.
 
 CAP has nevertheless been very influential in the design of distributed data systems. It deserves
 credit for catalyzing the exploration of the design space of systems with weak consistency
@@ -897,10 +860,10 @@ longer be used for justifying design decisions.
 As an alternative to CAP, we propose a simple \emph{delay-sensitivity} framework for reasoning about
 trade-offs between consistency guarantees and tolerance of network faults in a replicated database.
 Every operation is categorized as either $O(d)$, if its latency is sensitive to network delay, or
-$O(1)$, if it is independent of network delay. On the assumption that lost packets are retransmitted
-an unbounded number of times, we can model network faults (including partitions) as periods of
-greatly increased delay. The algorithm's sensitivity to network delay determines whether the system
-can still meet its service level agreement (SLA) when a network fault occurs.
+$O(1)$, if it is independent of network delay. On the assumption that lost messages are
+retransmitted an unbounded number of times, we can model network faults (including partitions) as
+periods of greatly increased delay. The algorithm's sensitivity to network delay determines whether
+the system can still meet its service level agreement (SLA) when a network fault occurs.
 
 The actual sensitivity of a system to network delay depends on its implementation, but -- in keeping
 with the goal of CAP -- we can prove that certain levels of consistency cannot be achieved without
@@ -909,9 +872,11 @@ summarized in Table~\ref{tab:op-latency}. We have not proved any new results in 
 merely drawn on existing distributed systems research dating mostly from the 1990s (and thus
 predating CAP).
 
-For future work, it would be interesting to model the \emph{distribution} of latencies for different
-concurrency control and replication algorithms (e.g.\ by extending PBS~\cite{Bailis2012to}), rather
-than modeling network delay as just a single number $d$.
+For future work, it would be interesting to model the \emph{probability distribution} of latencies
+for different concurrency control and replication algorithms (e.g.\ by extending
+PBS~\cite{Bailis2012to}), rather than modeling network delay as just a single number $d$. It would
+also be interesting to model the network communication topology of distributed algorithms more
+explicitly.
 
 We hope that by being more rigorous about the implications of different consistency levels on
 performance and fault tolerance, we can encourage designers of distributed data systems to continue
