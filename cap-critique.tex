@@ -547,10 +547,14 @@ consistency.)
 Similarly, we define an execution $E$ as \emph{opportunistically terminating linearizable} if $E$ is
 partitioned, or if $E$ is linearizable and every operation in $E$ terminates in finite time.
 
-From the results above, we can see that opportunistic terminating linearizability is impossible in
-the partitionable model (corollary~\ref{corr:2}), whereas opportunistic eventual consistency is
-possible. This distinction can be understood as the key result of CAP. However, it is arguably not a
-very interesting or insightful result.
+\begin{theorem}\label{th:4}
+Opportunistic terminating linearizability cannot be achieved in all executions of the partitionable
+model, whereas opportunistic eventual consistency \emph{can} be achieved.
+\end{theorem}
+
+The first part follows from corollary~\ref{corr:2}, and the second part follows from the algorithm
+described above. This distinction can be understood as the key result of CAP. However, it is
+arguably not a very interesting or insightful result.
 
 \subsection{Mismatch between formal model and practical systems}
 
