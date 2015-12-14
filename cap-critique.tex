@@ -7,7 +7,7 @@
 %% Please note that the line numbering option requires
 %% version 1.1 or newer of the wlpeerj.cls file.
 
-\documentclass[fleqn,10pt,lineno]{wlpeerj} % for journal submissions
+\documentclass[fleqn,12pt,lineno]{wlpeerj} % for journal submissions
 % \documentclass[fleqn,10pt]{wlpeerj} % for preprint submissions
 
 \usepackage[hyphens]{url}
@@ -24,19 +24,22 @@
 \author[1]{Martin Kleppmann}
 \affil[1]{University of Cambridge Computer Laboratory, Cambridge, UK}
 
-\keywords{distributed systems, consistency models, databases, replication}
+\keywords{distributed systems, consistency models, databases, replication, cloud computing, impossibility results}
 
 \begin{abstract}
-The \emph{CAP Theorem} is a frequently cited impossibility result in distributed systems, especially
+The \emph{CAP theorem} is a frequently cited impossibility result in distributed systems, especially
 among \emph{NoSQL} distributed databases. In this paper we survey some of the confusion about the
 meaning of CAP, including inconsistencies and ambiguities in its definitions, and we highlight some
-problems in its formalization. CAP is often interpreted as proof that eventually consistent
-databases have better availability properties than strongly consistent databases; although there is
-some truth in this, we show that more careful reasoning is required. These problems cast doubt on
-the utility of CAP as a tool for reasoning about trade-offs in practical systems. As alternative to
-CAP, we propose a \emph{delay-sensitivity} framework, which analyzes the sensitivity of operation
-latency to network delay, and which may help practitioners reason about the trade-offs between
-consistency guarantees and tolerance of network faults.
+problems in its formalization.
+
+CAP is often interpreted as proof that eventually consistent databases have better availability
+properties than strongly consistent databases; although there is some truth in this, we show that
+more careful reasoning is required. These problems cast doubt on the utility of CAP as a tool for
+reasoning about trade-offs in practical systems.
+
+As alternative to CAP, we propose a \emph{delay-sensitivity} framework, which analyzes the
+sensitivity of operation latency to network delay, and which may help practitioners reason about the
+trade-offs between consistency guarantees and tolerance of network faults.
 \end{abstract}
 
 \begin{document}
